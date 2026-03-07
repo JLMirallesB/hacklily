@@ -10,19 +10,20 @@ on:
 permissions:
   contents: write
 
+env:
+  LILYPOND_VERSION: "2.24.4"
+
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-13
             target: mac
-            runtime_template: darwin-universal
             artifact_glob: "desktop/release/*.dmg"
           - os: windows-2022
             target: win
-            runtime_template: win32-x64
             artifact_glob: "desktop/release/*.exe"
 
     runs-on: ${{ matrix.os }}
@@ -48,17 +49,51 @@ jobs:
       - name: Prepare runtime (macOS)
         if: runner.os == 'macOS'
         run: |
+          set -euo pipefail
+          VERSION="${LILYPOND_VERSION}"
+          URL="https://gitlab.com/lilypond/lilypond/-/releases/v${VERSION}/downloads/lilypond-${VERSION}-darwin-x86_64.tar.gz"
+          TMP_DIR="$(mktemp -d)"
+          ARCHIVE="${TMP_DIR}/lilypond.tar.gz"
+
+          curl -fL "${URL}" -o "${ARCHIVE}"
+          tar -xzf "${ARCHIVE}" -C "${TMP_DIR}"
+
           rm -rf desktop/runtime/current
-          mkdir -p desktop/runtime/current
-          cp -R desktop/runtime/templates/${{ matrix.runtime_template }}/. desktop/runtime/current/
+          mv "${TMP_DIR}/lilypond-${VERSION}" desktop/runtime/current
+          chmod +x desktop/runtime/current/bin/lilypond
+
+          if [ -f desktop/runtime/current/bin/musicxml2ly ]; then
+            chmod +x desktop/runtime/current/bin/musicxml2ly
+          fi
 
       - name: Prepare runtime (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (Test-Path desktop/runtime/current) { Remove-Item desktop/runtime/current -Recurse -Force }
-          New-Item -ItemType Directory -Path desktop/runtime/current | Out-Null
-          Copy-Item desktop/runtime/templates/${{ matrix.runtime_template }}/* desktop/runtime/current -Recurse -Force
+          $Version = "${{ env.LILYPOND_VERSION }}"
+          $Url = "https://gitlab.com/lilypond/lilypond/-/releases/v$Version/downloads/lilypond-$Version-mingw-x86_64.zip"
+          $Archive = Join-Path $env:RUNNER_TEMP "lilypond-$Version-win.zip"
+          $ExtractRoot = Join-Path $env:RUNNER_TEMP "lilypond-$Version-win"
+          $RuntimeSource = Join-Path $ExtractRoot "lilypond-$Version"
+
+          Invoke-WebRequest -Uri $Url -OutFile $Archive
+
+          if (Test-Path $ExtractRoot) {
+            Remove-Item $ExtractRoot -Recurse -Force
+          }
+
+          Expand-Archive -Path $Archive -DestinationPath $ExtractRoot
+
+          if (-not (Test-Path $RuntimeSource)) {
+            throw "Runtime source not found: $RuntimeSource"
+          }
+
+          if (Test-Path "desktop/runtime/current") {
+            Remove-Item "desktop/runtime/current" -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Path "desktop/runtime/current" | Out-Null
+          Copy-Item "$RuntimeSource/*" "desktop/runtime/current" -Recurse -Force
 
       - name: Validate runtime payload
         run: npm run check:runtime

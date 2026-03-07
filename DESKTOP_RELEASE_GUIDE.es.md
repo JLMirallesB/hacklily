@@ -8,10 +8,10 @@ Este repositorio ya está preparado para entregar binarios de la opción 2:
 
 ## Qué hace el equipo técnico antes de publicar
 
-1. Colocar el runtime de LilyPond en `desktop/runtime/templates/...` (mac y Windows).
+1. Verificar que el workflow usa la versión de LilyPond esperada (ahora: `2.24.4`).
 2. En GitHub Actions, ejecutar **Create Hacklily Desktop Release Tag** con versión `X.Y.Z`.
 3. Esto crea el tag `desktop-vX.Y.Z`.
-4. Ese tag dispara automáticamente el workflow de build de instaladores.
+4. Ese tag dispara automáticamente el workflow que descarga LilyPond y construye instaladores.
 5. Los binarios `.dmg` y `.exe` quedan adjuntos en la GitHub Release del tag.
 6. Publicar notas de versión y checksum.
 

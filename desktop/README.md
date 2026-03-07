@@ -22,7 +22,7 @@ GitHub publish/login calls are intentionally disabled in offline mode.
 
 - Node.js 20+
 - npm 10+
-- LilyPond runtime binaries copied into `desktop/runtime/current/bin`
+- For local/manual packaging: LilyPond runtime binaries copied into `desktop/runtime/current/bin`
 
 Expected runtime files:
 
@@ -52,7 +52,7 @@ This repository is prepared so every new tag `desktop-v*` builds installers auto
 Workflows:
 
 - `.github/workflows/create-desktop-release-tag.yml`: manually create/push a release tag.
-- `.github/workflows/desktop-release.yml`: when tag `desktop-v*` is pushed, build DMG/EXE and publish them to a GitHub Release.
+- `.github/workflows/desktop-release.yml`: when tag `desktop-v*` is pushed, download LilyPond `2.24.4`, build DMG/EXE, and publish them to a GitHub Release.
 
 Recommended release flow:
 
@@ -70,12 +70,12 @@ Recommended release flow:
 
 ## Runtime template folders
 
-Use template folders as placeholders for platform-specific runtime packs:
+Template folders are placeholders for manual/local builds:
 
 - `desktop/runtime/templates/darwin-universal/`
 - `desktop/runtime/templates/win32-x64/`
 
-Copy the target runtime into `desktop/runtime/current/` before packaging.
+For CI releases from tags, these templates are not used because the workflow downloads LilyPond automatically.
 
 ## Licensing
 
