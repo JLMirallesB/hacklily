@@ -79,6 +79,7 @@ interface Props {
   onModeChanged(mode: ViewMode): void;
   onShowClone(): void;
   onShowMakelily(tool: string): void;
+  onShowMutopia(): void;
   onShowNew(): void;
   onShowOpen(): void;
   onExportLy(): any;
@@ -143,6 +144,7 @@ export default class Header extends React.PureComponent<Props> {
       onLoadSong,
       onShowAbout,
       onShowClone,
+      onShowMutopia,
       onShowOpen,
       onShowNew,
       onShowPublish,
@@ -220,6 +222,7 @@ export default class Header extends React.PureComponent<Props> {
                   onLoadSong={onLoadSong}
                   onShowAbout={onShowAbout}
                   onShowClone={onShowClone}
+                  onShowMutopia={onShowMutopia}
                   onShowOpen={onShowOpen}
                   onShowPublish={onShowPublish}
                   onShowNew={onShowNew}

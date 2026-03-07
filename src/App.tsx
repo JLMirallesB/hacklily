@@ -42,6 +42,7 @@ import ModalLocked, {
 } from "./ModalLocked";
 import ModalLogin from "./ModalLogin";
 import ModalOpen from "./ModalOpen";
+import MutopiaSelector from "./MutopiaSelector";
 import ModalPublish, { doPublish, doUnpublish } from "./ModalPublish";
 import ModalSaving from "./ModalSaving";
 import ModalUnsavedChangesInterstitial from "./ModalUnsavedChangesInterstitial";
@@ -233,6 +234,7 @@ interface State {
   reconnectTimeout: number;
   rendererVersion: "stable" | "unstable";
   open: boolean;
+  mutopiaOpen: boolean;
   saving: boolean;
   showMakelily: typeof Makelily | null;
   windowWidth: number;
@@ -287,6 +289,7 @@ export default class App extends React.PureComponent<Props, State> {
     reconnectTimeout: NaN,
     rendererVersion: "stable",
     open: false,
+    mutopiaOpen: false,
     saving: false,
     showMakelily: null,
     windowWidth: window.innerWidth,
@@ -378,6 +381,7 @@ export default class App extends React.PureComponent<Props, State> {
         onModeChanged={this.handleModeChanged}
         onShowClone={this.handleShowSaveAs}
         onShowMakelily={this.handleShowMakelily}
+        onShowMutopia={this.handleShowMutopia}
         onShowNew={this.handleShowNew}
         onShowOpen={this.handleShowOpen}
         onShowPublish={this.handleShowPublish}
@@ -881,6 +885,14 @@ export default class App extends React.PureComponent<Props, State> {
     });
   };
 
+  private handleShowMutopia = (): void => {
+    this.setState({ mutopiaOpen: true });
+  };
+
+  private handleHideMutopia = (): void => {
+    this.setState({ mutopiaOpen: false });
+  };
+
   private handleShowMakelily = async (
     tool?: string,
     cb?: (ly: string) => void,
@@ -1127,6 +1139,7 @@ export default class App extends React.PureComponent<Props, State> {
       saving,
       showMakelily,
       open,
+      mutopiaOpen,
     } = this.state;
 
     const { about, auth, csrf, setCSRF, "404": _404, saveAs } = this.props;
@@ -1189,6 +1202,13 @@ export default class App extends React.PureComponent<Props, State> {
             onDeleteSong={this.handleDeleteSong}
             onLoadSong={this.handleLoadSong}
             onHide={this.handleHideOpen}
+          />
+        );
+      case mutopiaOpen:
+        return (
+          <MutopiaSelector
+            onLoadSong={this.handleLoadSong}
+            onHide={this.handleHideMutopia}
           />
         );
       case showMakelily !== null:

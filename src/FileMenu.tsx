@@ -38,6 +38,7 @@ interface Props {
   onLoadSong(song: string): void;
   onShowAbout(): void;
   onShowClone(): void;
+  onShowMutopia(): void;
   onShowOpen(): void;
   onShowNew(): void;
   onShowPublish(): void;
@@ -61,6 +62,7 @@ export default class FileMenu extends React.PureComponent<Props> {
       onSignOut,
       onShowAbout,
       onShowClone,
+      onShowMutopia,
       onShowOpen,
       onExportLy,
       onExportMIDI,
@@ -102,6 +104,11 @@ export default class FileMenu extends React.PureComponent<Props> {
           icon="document-open"
           text="Open&hellip;"
           onClick={onShowOpen}
+        />
+        <MenuItem
+          icon="music"
+          text="Browse MutopiaProject&hellip;"
+          onClick={onShowMutopia}
         />
         <MenuItem
           icon="import"
