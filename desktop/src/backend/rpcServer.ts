@@ -177,7 +177,9 @@ export async function startRpcServer(config: RuntimeConfig): Promise<() => Promi
         }
 
         case "render": {
-          if (!isRenderParams(parsed.params)) {
+          const params = parsed.params;
+
+          if (!isRenderParams(params)) {
             send(socket, makeError(id, -32602, "Invalid params"));
             return;
           }
@@ -186,7 +188,7 @@ export async function startRpcServer(config: RuntimeConfig): Promise<() => Promi
 
           try {
             const result = await enqueue(() =>
-              renderOffline(parsed.params.src, parsed.params.backend, {
+              renderOffline(params.src, params.backend, {
                 runtimeDir: config.runtimeDir,
               }),
             );
