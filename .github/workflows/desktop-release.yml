@@ -99,6 +99,31 @@ jobs:
         run: npm run check:runtime
         working-directory: desktop
 
+      - name: Smoke test runtime (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          LILYPOND="desktop/runtime/current/bin/lilypond"
+          TMPDIR_SMOKE="$(mktemp -d)"
+          printf '\\version "2.24.0"\n{ c'"'"'4 d e f }\n' > "${TMPDIR_SMOKE}/test.ly"
+          "${LILYPOND}" -o "${TMPDIR_SMOKE}/out" "${TMPDIR_SMOKE}/test.ly"
+          test -f "${TMPDIR_SMOKE}/out.pdf"
+          echo "LilyPond smoke test passed"
+
+      - name: Smoke test runtime (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $LilypondBin = "desktop/runtime/current/bin/lilypond.exe"
+          $TmpPath = Join-Path $env:RUNNER_TEMP "lilypond-smoke"
+          New-Item -ItemType Directory -Path $TmpPath -Force | Out-Null
+          $Score = '\version "2.24.0"' + "`n" + "{ c'4 d e f }"
+          Set-Content -Path (Join-Path $TmpPath "test.ly") -Value $Score -Encoding utf8
+          & $LilypondBin -o (Join-Path $TmpPath "out") (Join-Path $TmpPath "test.ly")
+          if ($LASTEXITCODE -ne 0) { throw "lilypond exited with code $LASTEXITCODE" }
+          if (-not (Test-Path (Join-Path $TmpPath "out.pdf"))) { throw "out.pdf not found after render" }
+          Write-Host "LilyPond smoke test passed"
+
       - name: Build installer
         run: npm run dist:${{ matrix.target }}
         working-directory: desktop
