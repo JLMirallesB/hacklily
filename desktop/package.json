@@ -1,0 +1,68 @@
+{
+  "name": "hacklily-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hacklily Desktop app with local renderer (no Docker dependency for end users).",
+  "main": "build/main.js",
+  "author": "Hacklily contributors",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "clean": "rimraf build release",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "build:frontend": "node ./scripts/build-frontend.mjs",
+    "check:runtime": "node ./scripts/ensure-runtime.mjs",
+    "dist:mac": "npm run build:frontend && npm run check:runtime && npm run build && electron-builder --mac dmg",
+    "dist:win": "npm run build:frontend && npm run check:runtime && npm run build && electron-builder --win nsis",
+    "dist": "npm run build:frontend && npm run check:runtime && npm run build && electron-builder --mac dmg --win nsis"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/ws": "^8.18.1",
+    "electron": "^36.3.1",
+    "electron-builder": "^24.13.3",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.8.2"
+  },
+  "build": {
+    "appId": "org.hacklily.desktop",
+    "productName": "Hacklily Desktop",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "build/**/*",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist",
+        "to": "frontend"
+      },
+      {
+        "from": "runtime/current",
+        "to": "lilypond"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Hacklily Desktop"
+    }
+  }
+}

@@ -136,3 +136,8 @@ Thumbs.db
 
 # Rust
 /server/renderer-server/target/
+
+# Desktop app (option 2)
+/desktop/node_modules/
+/desktop/build/
+/desktop/release/
