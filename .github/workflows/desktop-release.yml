@@ -60,6 +60,10 @@ jobs:
           New-Item -ItemType Directory -Path desktop/runtime/current | Out-Null
           Copy-Item desktop/runtime/templates/${{ matrix.runtime_template }}/* desktop/runtime/current -Recurse -Force
 
+      - name: Validate runtime payload
+        run: npm run check:runtime
+        working-directory: desktop
+
       - name: Build installer
         run: npm run dist:${{ matrix.target }}
         working-directory: desktop
