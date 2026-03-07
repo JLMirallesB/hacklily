@@ -164,3 +164,12 @@ A full copy of the AGPL version 3 is available in LICENSE.AGPL.txt.
 ## Deployment
 
 Whenever a commit is pushed to master, Netlify will deploy a new version.
+
+## Offline desktop binaries (Option 2)
+
+If you want installable **Hacklily Desktop** binaries for non-technical users (DMG/EXE without Docker), see:
+
+- `desktop/README.md`
+- `DESKTOP_RELEASE_GUIDE.es.md`
+- `.github/workflows/create-desktop-release-tag.yml`
+- `.github/workflows/desktop-release.yml`

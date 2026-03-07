@@ -1,0 +1,67 @@
+name: Create Hacklily Desktop Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SemVer without prefix (e.g. 1.0.0)"
+        required: true
+      target_ref:
+        description: "Branch or commit to tag (default: main)"
+        required: false
+        default: "main"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "Invalid version: $VERSION"
+            echo "Expected format: X.Y.Z (optionally with prerelease/build suffix)."
+            exit 1
+          fi
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ inputs.version }}
+          TARGET_REF: ${{ inputs.target_ref }}
+        run: |
+          set -euo pipefail
+
+          TAG="desktop-v${VERSION}"
+
+          git fetch origin --tags
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists in origin."
+            exit 1
+          fi
+
+          # Resolve the target commit from origin when possible.
+          if git rev-parse --verify "origin/${TARGET_REF}^{commit}" >/dev/null 2>&1; then
+            COMMIT_SHA="$(git rev-parse "origin/${TARGET_REF}^{commit}")"
+          else
+            COMMIT_SHA="$(git rev-parse "${TARGET_REF}^{commit}")"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "${TAG}" "${COMMIT_SHA}" -m "Hacklily Desktop release ${TAG}"
+          git push origin "${TAG}"
+
+          echo "Created tag ${TAG} on ${COMMIT_SHA}" >> "$GITHUB_STEP_SUMMARY"
+          echo "This tag triggers the installer workflow automatically." >> "$GITHUB_STEP_SUMMARY"

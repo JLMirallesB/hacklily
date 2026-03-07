@@ -1,0 +1,89 @@
+name: Build Hacklily Desktop Installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+      - "offline-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: mac
+            runtime_template: darwin-universal
+            artifact_glob: "desktop/release/*.dmg"
+          - os: windows-2022
+            target: win
+            runtime_template: win32-x64
+            artifact_glob: "desktop/release/*.exe"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install desktop dependencies
+        run: npm install
+        working-directory: desktop
+
+      - name: Prepare runtime (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          rm -rf desktop/runtime/current
+          mkdir -p desktop/runtime/current
+          cp -R desktop/runtime/templates/${{ matrix.runtime_template }}/. desktop/runtime/current/
+
+      - name: Prepare runtime (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path desktop/runtime/current) { Remove-Item desktop/runtime/current -Recurse -Force }
+          New-Item -ItemType Directory -Path desktop/runtime/current | Out-Null
+          Copy-Item desktop/runtime/templates/${{ matrix.runtime_template }}/* desktop/runtime/current -Recurse -Force
+
+      - name: Build installer
+        run: npm run dist:${{ matrix.target }}
+        working-directory: desktop
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hacklily-desktop-${{ matrix.target }}
+          path: ${{ matrix.artifact_glob }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || startsWith(github.ref, 'refs/tags/offline-v')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
