@@ -1,19 +1,42 @@
-import { app, BrowserWindow, dialog } from "electron";
+import { app, BrowserWindow, dialog, net, protocol, session } from "electron";
 import path from "node:path";
 
 import { startRpcServer } from "./backend/rpcServer";
 
 const WS_PORT = 3210;
+const APP_SCHEME = "app";
+
+// Must be called before app is ready.
+// Registers "app://" as a standard secure scheme so that:
+//  - fetch() works from pages loaded under this scheme
+//  - Absolute paths like /hackmidi/samples/ resolve correctly
+//    (they become app://frontend/hackmidi/samples/...)
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: APP_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+    },
+  },
+]);
 
 let mainWindow: BrowserWindow | null = null;
 let stopServer: null | (() => Promise<void>) = null;
 
-function resolveFrontendIndex(): string {
+function resolveFrontendDir(): string {
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, "frontend", "index.html");
+    return path.join(process.resourcesPath, "frontend");
   }
 
-  return path.resolve(__dirname, "../../dist/index.html");
+  const envPath = process.env.HACKLILY_FRONTEND_DIR;
+  if (envPath) {
+    return envPath;
+  }
+
+  return path.resolve(__dirname, "../../dist");
 }
 
 function resolveRuntimeDir(): string {
@@ -29,8 +52,17 @@ function resolveRuntimeDir(): string {
   return path.resolve(__dirname, "../runtime/current");
 }
 
-function createWindow(): void {
-  const indexFile = resolveFrontendIndex();
+function setupFrontendProtocol(frontendDir: string): void {
+  session.defaultSession.protocol.handle(APP_SCHEME, async (request) => {
+    const url = new URL(request.url);
+    // url.pathname is already decoded and starts with "/"
+    const relPath = url.pathname.replace(/^\/+/, "");
+    const filePath = path.join(frontendDir, relPath);
+    return net.fetch(`file://${filePath}`);
+  });
+}
+
+function createWindow(frontendDir: string): void {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -44,7 +76,11 @@ function createWindow(): void {
     },
   });
 
-  void mainWindow.loadFile(indexFile);
+  // loadURL with the custom scheme so absolute paths resolve correctly.
+  // The page is served at app://frontend/index.html, meaning:
+  //   fetch("/hackmidi/samples/x") → app://frontend/hackmidi/samples/x
+  //   which our protocol handler maps to frontendDir/hackmidi/samples/x
+  void mainWindow.loadURL(`${APP_SCHEME}://frontend/index.html`);
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -53,6 +89,9 @@ function createWindow(): void {
 
 async function bootstrap(): Promise<void> {
   const runtimeDir = resolveRuntimeDir();
+  const frontendDir = resolveFrontendDir();
+
+  setupFrontendProtocol(frontendDir);
 
   try {
     stopServer = await startRpcServer({
@@ -78,7 +117,7 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
-  createWindow();
+  createWindow(frontendDir);
 }
 
 app.whenReady().then(() => {
@@ -86,7 +125,8 @@ app.whenReady().then(() => {
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      const frontendDir = resolveFrontendDir();
+      createWindow(frontendDir);
     }
   });
 });

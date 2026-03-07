@@ -34,7 +34,7 @@ import {
 import { css, StyleSheet } from "aphrodite";
 import React from "react";
 
-import logoSvg from "./logo.svg";
+import logoSvg from "./logo.png";
 
 import { Auth } from "./auth";
 import FileMenu from "./FileMenu";
