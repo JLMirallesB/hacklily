@@ -30,6 +30,7 @@ async function runCommand(
   args: string[],
   cwd: string,
   timeoutMs: number,
+  extraEnv?: Record<string, string>,
 ): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -37,6 +38,7 @@ async function runCommand(
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
+        ...extraEnv,
       },
     });
 
@@ -174,11 +176,18 @@ async function runMusicXml2Ly(
 
     await fs.writeFile(inputPath, src, "utf8");
 
+    // musicxml2ly internally calls `lilypond` (for convert-ly notation updates).
+    // Prepend the bundled bin/ dir to PATH so the nested call resolves correctly.
+    const lilypondBinDir = path.join(context.runtimeDir, "bin");
+    const pathSep = process.platform === "win32" ? ";" : ":";
+    const extendedPath = `${lilypondBinDir}${pathSep}${process.env.PATH ?? ""}`;
+
     const result = await runCommand(
       musicxmlBin,
       [inputPath, "-o", outputPath],
       workDir,
       MUSICXML_TIMEOUT_MS,
+      { PATH: extendedPath },
     );
 
     const logs = [result.stderr, result.stdout]
@@ -194,15 +203,24 @@ async function runMusicXml2Ly(
       };
     }
 
-    if (result.code !== 0 && result.code !== null) {
+    // Try to read the output file regardless of exit code: musicxml2ly writes
+    // the .ly file *before* running convert-ly, so partial failures still
+    // produce usable output.
+    let out: string | null = null;
+    try {
+      out = await fs.readFile(outputPath, "utf8");
+    } catch {
+      // file not written at all → genuine failure
+    }
+
+    if (out === null) {
       return {
         files: [],
-        logs: `${logs}\nmusicxml2ly exited with code ${result.code}.`.trim(),
+        logs: `${logs}\nmusicxml2ly exited with code ${result.code ?? "unknown"}.`.trim(),
         midi: "",
       };
     }
 
-    const out = await fs.readFile(outputPath, "utf8");
     return {
       files: [out],
       logs,
