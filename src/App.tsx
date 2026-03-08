@@ -938,17 +938,15 @@ export default class App extends React.PureComponent<Props, State> {
         await rpc.call("render", { version, backend: "svg", src: song.src })
       ).result.files;
 
+      // SVG files are returned as raw UTF-8 text; encode to base64 for the data URL.
+      const toSvgDataUrl = (svg: string): string =>
+        "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+
       if (files.length === 1) {
-        this.triggerDownload(
-          `${name}.svg`,
-          "data:image/svg+xml;base64," + files[0],
-        );
+        this.triggerDownload(`${name}.svg`, toSvgDataUrl(files[0]));
       } else {
         files.forEach((file, i) => {
-          this.triggerDownload(
-            `${name}-page${i + 1}.svg`,
-            "data:image/svg+xml;base64," + file,
-          );
+          this.triggerDownload(`${name}-page${i + 1}.svg`, toSvgDataUrl(file));
         });
       }
     } catch (err) {

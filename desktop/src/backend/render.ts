@@ -82,7 +82,13 @@ async function collectFiles(sessionDir: string, extension: string): Promise<stri
   const mapped: string[] = [];
   for (const name of files) {
     const filePath = path.join(sessionDir, name);
-    mapped.push((await fs.readFile(filePath)).toString("base64"));
+    // SVG is returned as UTF-8 text (Preview.tsx sets it directly as innerHTML).
+    // Binary formats (PDF, PNG) are returned as base64.
+    if (extension === ".svg") {
+      mapped.push(await fs.readFile(filePath, "utf8"));
+    } else {
+      mapped.push((await fs.readFile(filePath)).toString("base64"));
+    }
   }
 
   return mapped;
