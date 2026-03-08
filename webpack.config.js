@@ -69,6 +69,7 @@ module.exports = {
     new webpack.EnvironmentPlugin([
       "REACT_APP_GITHUB_CLIENT_ID",
       "REACT_APP_BACKEND_WS_URL",
+      "REACT_APP_VERSION",
     ]),
   ].filter((a) => !!a),
 };
