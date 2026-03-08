@@ -21,6 +21,11 @@ export interface ConvertLyResult {
   logs: string;
 }
 
+export interface ImportMidiResult {
+  content: string;
+  logs: string;
+}
+
 contextBridge.exposeInMainWorld("electronAPI", {
   /** Show native Open dialog and return {filePath, content}, or null if cancelled. */
   openFile: (): Promise<OpenFileResult | null> =>
@@ -40,4 +45,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   /** Run convert-ly on content. Returns updated content or null if unavailable/failed. */
   convertLy: (content: string): Promise<ConvertLyResult | null> =>
     ipcRenderer.invoke("file:convertLy", { content }),
+
+  /** Show native Open dialog for .mid/.midi, run midi2ly, return LilyPond source. */
+  importMidi: (): Promise<ImportMidiResult | { error: string } | null> =>
+    ipcRenderer.invoke("file:importMidi"),
 });

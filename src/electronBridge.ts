@@ -44,6 +44,13 @@ export interface ConvertLyResult {
   logs: string;
 }
 
+export interface ImportMidiResult {
+  /** The LilyPond source produced by midi2ly. */
+  content: string;
+  /** Any warnings/messages printed to stderr by midi2ly. */
+  logs: string;
+}
+
 interface ElectronAPI {
   openFile(): Promise<OpenFileResult | null>;
   saveFile(content: string, filePath: string): Promise<boolean>;
@@ -52,6 +59,7 @@ interface ElectronAPI {
     defaultName?: string,
   ): Promise<SaveFileResult | null>;
   convertLy(content: string): Promise<ConvertLyResult | null>;
+  importMidi?(): Promise<ImportMidiResult | { error: string } | null>;
 }
 
 function getAPI(): ElectronAPI | null {
@@ -94,4 +102,16 @@ export async function convertLy(
   content: string,
 ): Promise<ConvertLyResult | null> {
   return (await getAPI()?.convertLy(content)) ?? null;
+}
+
+/**
+ * Show a native MIDI file picker and convert the selected file to LilyPond
+ * source using the bundled midi2ly binary.
+ * Returns null if the user cancelled or midi2ly is unavailable.
+ * Returns { error } if midi2ly ran but failed.
+ */
+export async function importMidi(): Promise<
+  ImportMidiResult | { error: string } | null
+> {
+  return (await getAPI()?.importMidi?.()) ?? null;
 }

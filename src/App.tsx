@@ -18,7 +18,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-import { Button, Classes, Dialog, Icon } from "@blueprintjs/core";
+import { Alert, Button, Classes, Dialog, Icon, Intent } from "@blueprintjs/core";
 import { css } from "aphrodite";
 import Makelily from "makelily"; // note: use for types only
 import * as monacoEditor from "monaco-editor";
@@ -27,6 +27,7 @@ import React from "react";
 import { Auth, checkLogin, revokeGitHubAuth } from "./auth";
 import {
   convertLy,
+  importMidi,
   isDesktop,
   openFile,
   saveFile,
@@ -275,6 +276,8 @@ interface State {
    * filePath is null when the source came from Mutopia (no local file).
    */
   convertLyPending: { content: string; filePath: string | null } | null;
+  /** Non-null when midi2ly failed — message is shown in an error Alert. */
+  midiImportError: string | null;
   saving: boolean;
   showMakelily: typeof Makelily | null;
   windowWidth: number;
@@ -333,6 +336,7 @@ export default class App extends React.PureComponent<Props, State> {
     xmlImportOpen: false,
     localFilePath: null,
     convertLyPending: null,
+    midiImportError: null,
     saving: false,
     showMakelily: null,
     windowWidth: window.innerWidth,
@@ -384,8 +388,15 @@ export default class App extends React.PureComponent<Props, State> {
   }
 
   render(): JSX.Element {
-    const { logs, mode, midi, defaultSelection, rendererVersion, windowWidth } =
-      this.state;
+    const {
+      logs,
+      mode,
+      midi,
+      defaultSelection,
+      rendererVersion,
+      windowWidth,
+      midiImportError,
+    } = this.state;
 
     const {
       auth,
@@ -443,6 +454,7 @@ export default class App extends React.PureComponent<Props, State> {
         onShowMakelily={this.handleShowMakelily}
         onShowMutopia={this.handleShowMutopia}
         onShowXmlImport={this.handleShowXmlImport}
+        onImportMidi={this.handleImportMidi}
         onShowNew={this.handleShowNew}
         onShowOpen={this.handleShowOpen}
         onShowPublish={this.handleShowPublish}
@@ -470,6 +482,22 @@ export default class App extends React.PureComponent<Props, State> {
       <div className="App">
         {header}
         {this.renderModal()}
+        {midiImportError && (
+          <Alert
+            isOpen={true}
+            intent={Intent.DANGER}
+            icon="error"
+            confirmButtonText="OK"
+            onConfirm={() => this.setState({ midiImportError: null })}
+          >
+            <p>
+              <strong>MIDI import failed</strong>
+            </p>
+            <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.85em" }}>
+              {midiImportError}
+            </pre>
+          </Alert>
+        )}
         <div className="content">
           <Editor
             ref={this.setEditor}
@@ -995,6 +1023,20 @@ export default class App extends React.PureComponent<Props, State> {
 
   private handleShowXmlImport = (): void => {
     this.setState({ xmlImportOpen: true });
+  };
+
+  /**
+   * Show a native MIDI file picker and convert the selected file to LilyPond
+   * source using the bundled midi2ly binary. Loads the result into the sandbox.
+   */
+  private handleImportMidi = async (): Promise<void> => {
+    const result = await importMidi();
+    if (!result) return; // user cancelled or midi2ly not available
+    if ("error" in result) {
+      this.setState({ midiImportError: result.error });
+      return;
+    }
+    this._loadSandboxContent(result.content);
   };
 
   private handleHideXmlImport = (): void => {

@@ -85,6 +85,7 @@ interface Props {
   onShowMakelily(tool: string): void;
   onShowMutopia(): void;
   onShowXmlImport(): void;
+  onImportMidi(): void;
   onShowNew(): void;
   onShowOpen(): void;
   onExportLy(): any;
@@ -154,6 +155,7 @@ export default class Header extends React.PureComponent<Props> {
       onShowClone,
       onShowMutopia,
       onShowXmlImport,
+      onImportMidi,
       onShowOpen,
       onShowNew,
       onShowPublish,
@@ -246,6 +248,7 @@ export default class Header extends React.PureComponent<Props> {
                   onShowClone={onShowClone}
                   onShowMutopia={onShowMutopia}
                   onShowXmlImport={onShowXmlImport}
+                  onImportMidi={onImportMidi}
                   onShowOpen={onShowOpen}
                   onShowPublish={onShowPublish}
                   onShowNew={onShowNew}

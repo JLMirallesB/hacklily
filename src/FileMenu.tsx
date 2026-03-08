@@ -22,6 +22,7 @@ import { Menu, MenuDivider, MenuItem } from "@blueprintjs/core";
 import React from "react";
 
 import { Auth } from "./auth";
+import { isDesktop } from "./electronBridge";
 
 interface Props {
   auth: Auth | null;
@@ -40,6 +41,7 @@ interface Props {
   onShowClone(): void;
   onShowMutopia(): void;
   onShowXmlImport(): void;
+  onImportMidi(): void;
   onShowOpen(): void;
   onShowNew(): void;
   onShowPublish(): void;
@@ -65,6 +67,7 @@ export default class FileMenu extends React.PureComponent<Props> {
       onShowClone,
       onShowMutopia,
       onShowXmlImport,
+      onImportMidi,
       onShowOpen,
       onExportLy,
       onExportMIDI,
@@ -141,6 +144,13 @@ export default class FileMenu extends React.PureComponent<Props> {
           text="Import MusicXML&hellip;"
           onClick={onShowXmlImport}
         />
+        {isDesktop() && (
+          <MenuItem
+            icon="music"
+            text="Import MIDI&hellip;"
+            onClick={onImportMidi}
+          />
+        )}
         <MenuItem
           icon="floppy-disk"
           text="Save"

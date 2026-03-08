@@ -267,6 +267,72 @@ ipcMain.handle(
   },
 );
 
+interface ImportMidiIpcResult {
+  content: string;
+  logs: string;
+}
+
+ipcMain.handle(
+  "file:importMidi",
+  async (): Promise<ImportMidiIpcResult | { error: string } | null> => {
+    if (!runtimeDir) return { error: "Runtime directory not found." };
+
+    // midi2ly is a Python script in the LilyPond bundle — no .exe suffix.
+    const midi2lyBin = path.join(runtimeDir, "bin", "midi2ly");
+    try {
+      await fs.access(midi2lyBin);
+    } catch {
+      return { error: "midi2ly is not available in the bundled LilyPond runtime." };
+    }
+
+    const openResult = await dialog.showOpenDialog(mainWindow!, {
+      title: "Import MIDI file",
+      properties: ["openFile"],
+      filters: [
+        { name: "MIDI files", extensions: ["mid", "midi"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+
+    if (openResult.canceled || openResult.filePaths.length === 0) return null;
+
+    const midiPath = openResult.filePaths[0];
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "hacklily-midi-"));
+    try {
+      const outputPath = path.join(tmpDir, "out.ly");
+
+      // Extend PATH so midi2ly can find the bundled Python/lilypond if needed.
+      const binDir = path.join(runtimeDir, "bin");
+      const pathSep = process.platform === "win32" ? ";" : ":";
+      const extPath = `${binDir}${pathSep}${process.env.PATH ?? ""}`;
+
+      let stderr = "";
+      const exitCode = await new Promise<number | null>((resolve) => {
+        const child = spawn(midi2lyBin, ["-o", outputPath, midiPath], {
+          env: { ...process.env, PATH: extPath },
+          stdio: ["ignore", "ignore", "pipe"],
+        });
+        child.stderr.on("data", (chunk: Buffer) => {
+          stderr += chunk.toString();
+        });
+        child.on("error", () => resolve(-1));
+        child.on("close", resolve);
+      });
+
+      if (exitCode !== 0) {
+        return {
+          error: `midi2ly exited with code ${exitCode}.\n${stderr}`.trim(),
+        };
+      }
+
+      const content = await fs.readFile(outputPath, "utf8");
+      return { content, logs: stderr.trim() };
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  },
+);
+
 // ────────────────────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
