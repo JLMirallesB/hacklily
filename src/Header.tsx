@@ -64,11 +64,15 @@ interface Player {
 interface Props {
   auth: Auth | null;
   canExport: boolean;
+  canSave: boolean;
+  canSaveAs: boolean;
   colourScheme: "vs-dark" | "vs";
   inSandbox: boolean;
   isDirty: boolean;
   readOnly: boolean;
   loggedIn: boolean;
+  /** Basename of the currently open local file, or null. Shown in the title. */
+  localFileName: string | null;
   midi: ArrayBuffer | null;
   mode: ViewMode;
   online: boolean;
@@ -133,7 +137,10 @@ export default class Header extends React.PureComponent<Props> {
     const {
       auth,
       canExport,
+      canSave,
+      canSaveAs,
       colourScheme,
+      localFileName,
       readOnly,
       inSandbox,
       mode,
@@ -205,10 +212,18 @@ export default class Header extends React.PureComponent<Props> {
           )}
           {windowWidth >= MIN_BOTH_WIDTH && (
             <div className={Classes.NAVBAR_HEADING}>
-              Hacklily Desktop{" "}
-              <span style={{ fontSize: "0.75em", opacity: 0.6 }}>
-                v{process.env.REACT_APP_VERSION ?? ""}
-              </span>
+              {localFileName ? (
+                <span title={this.props.localFileName ?? undefined}>
+                  {localFileName}
+                </span>
+              ) : (
+                <>
+                  Hacklily Desktop{" "}
+                  <span style={{ fontSize: "0.75em", opacity: 0.6 }}>
+                    v{process.env.REACT_APP_VERSION ?? ""}
+                  </span>
+                </>
+              )}
             </div>
           )}
           {windowWidth >= MIN_BOTH_WIDTH && <NavbarDivider />}
@@ -218,8 +233,8 @@ export default class Header extends React.PureComponent<Props> {
                 <FileMenu
                   auth={auth}
                   canCreateNew={online}
-                  canSave={online && !readOnly}
-                  canSaveAs={online && !inSandbox}
+                  canSave={canSave}
+                  canSaveAs={canSaveAs}
                   canExport={canExport}
                   colourScheme={colourScheme}
                   onDeleteSong={onDeleteSong}

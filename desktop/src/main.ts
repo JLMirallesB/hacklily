@@ -1,4 +1,14 @@
-import { app, BrowserWindow, dialog, net, protocol, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  net,
+  protocol,
+  session,
+  shell,
+} from "electron";
+import fs from "node:fs/promises";
 import path from "node:path";
 
 import { startRpcServer } from "./backend/rpcServer";
@@ -73,6 +83,7 @@ function createWindow(frontendDir: string): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: path.join(__dirname, "preload.js"),
     },
   });
 
@@ -134,6 +145,61 @@ async function bootstrap(): Promise<void> {
 
   createWindow(frontendDir);
 }
+
+// ── Local file IPC ──────────────────────────────────────────────────────────
+
+ipcMain.handle("file:open", async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: "Open LilyPond file",
+    properties: ["openFile"],
+    filters: [
+      { name: "LilyPond files", extensions: ["ly"] },
+      { name: "All files", extensions: ["*"] },
+    ],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  const filePath = result.filePaths[0];
+  const content = await fs.readFile(filePath, "utf8");
+  return { filePath, content };
+});
+
+ipcMain.handle(
+  "file:save",
+  async (_event, { content, filePath }: { content: string; filePath: string }) => {
+    await fs.writeFile(filePath, content, "utf8");
+    return true;
+  },
+);
+
+ipcMain.handle(
+  "file:saveAs",
+  async (
+    _event,
+    { content, defaultName }: { content: string; defaultName?: string },
+  ) => {
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      title: "Save LilyPond file",
+      defaultPath: defaultName ?? "untitled.ly",
+      filters: [
+        { name: "LilyPond files", extensions: ["ly"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+
+    await fs.writeFile(result.filePath, content, "utf8");
+    return { filePath: result.filePath };
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
   void bootstrap();

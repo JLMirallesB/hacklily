@@ -25,6 +25,12 @@ import * as monacoEditor from "monaco-editor";
 import React from "react";
 
 import { Auth, checkLogin, revokeGitHubAuth } from "./auth";
+import {
+  isDesktop,
+  openFile,
+  saveFile,
+  saveFileAs,
+} from "./electronBridge";
 import Editor from "./Editor";
 import { cat, FileNotFound, getDefaultBranch, getOrCreateRepo } from "./gitfs";
 import Header, {
@@ -237,6 +243,8 @@ interface State {
   open: boolean;
   mutopiaOpen: boolean;
   xmlImportOpen: boolean;
+  /** Absolute path of the currently open local .ly file, or null if none. */
+  localFilePath: string | null;
   saving: boolean;
   showMakelily: typeof Makelily | null;
   windowWidth: number;
@@ -293,6 +301,7 @@ export default class App extends React.PureComponent<Props, State> {
     open: false,
     mutopiaOpen: false,
     xmlImportOpen: false,
+    localFilePath: null,
     saving: false,
     showMakelily: null,
     windowWidth: window.innerWidth,
@@ -306,6 +315,7 @@ export default class App extends React.PureComponent<Props, State> {
 
   componentDidMount(): void {
     window.addEventListener("resize", this.handleWindowResize);
+    window.addEventListener("keydown", this.handleKeyDown);
     this.connectToWS();
     this.fetchSong();
     lock(this.props.edit || "null");
@@ -337,6 +347,7 @@ export default class App extends React.PureComponent<Props, State> {
   componentWillUnmount(): void {
     this.disconnectWS();
     window.removeEventListener("beforeunload", this.handleBeforeUnload);
+    window.removeEventListener("keydown", this.handleKeyDown);
     window.addEventListener("resize", this.handleWindowResize);
     setEditingNotificationHandler(null);
   }
@@ -356,6 +367,7 @@ export default class App extends React.PureComponent<Props, State> {
     const online: boolean = this.isOnline();
     const preview: React.ReactNode = this.renderPreview();
     const song: Song | undefined = this.song();
+    const desktop: boolean = isDesktop();
     const sandboxIsDirty: boolean =
       Boolean(this.props.edit || this.props.src) &&
       Boolean(this.props.dirtySongs.null);
@@ -367,6 +379,20 @@ export default class App extends React.PureComponent<Props, State> {
         this.state.branch
       }/${songParts.slice(2).join("/")}`;
     }
+
+    const readOnly: boolean =
+      Boolean(this.props.src) ||
+      (song ? song.baseSHA === PUBLIC_READONLY : false);
+    const inSandbox: boolean = !this.props.edit && !this.props.src;
+
+    // In desktop mode we can always save to/from disk, regardless of GitHub auth.
+    const canSave: boolean = desktop ? !readOnly : online && !readOnly;
+    const canSaveAs: boolean = desktop || (online && !inSandbox);
+
+    // Derive a display name from the local file path (basename only).
+    const localFileName: string | null = this.state.localFilePath
+      ? this.state.localFilePath.replace(/.*[\\/]/, "") || null
+      : null;
 
     const header: React.ReactNode = (
       <Header
@@ -391,14 +417,13 @@ export default class App extends React.PureComponent<Props, State> {
         onShowPublish={this.handleShowPublish}
         sandboxIsDirty={sandboxIsDirty}
         song={this.props.src ? "untitled-import" : edit}
-        inSandbox={!this.props.edit && !this.props.src}
+        inSandbox={inSandbox}
         isDirty={this.isDirty()}
-        readOnly={
-          Boolean(this.props.src) ||
-          (song ? song.baseSHA === PUBLIC_READONLY : false)
-        }
+        readOnly={readOnly}
         windowWidth={windowWidth}
         colourScheme={colourScheme}
+        canSave={canSave}
+        canSaveAs={canSaveAs}
         canExport={Boolean(
           online && this.rpc && logs && this.state.pendingPreviews === 0,
         )}
@@ -406,6 +431,7 @@ export default class App extends React.PureComponent<Props, State> {
         onExportMIDI={this.handleExportMIDI}
         onExportPDF={this.handleExportPDF}
         songURL={songURL}
+        localFileName={localFileName}
       />
     );
 
@@ -884,9 +910,11 @@ export default class App extends React.PureComponent<Props, State> {
   };
 
   private handleShowOpen = (): void => {
-    this.setState({
-      open: true,
-    });
+    if (isDesktop()) {
+      void this.handleOpenLocalFile();
+      return;
+    }
+    this.setState({ open: true });
   };
 
   private handleShowMutopia = (): void => {
@@ -898,11 +926,19 @@ export default class App extends React.PureComponent<Props, State> {
   };
 
   private handleLoadSrc = (src: string): void => {
-    this.setQueryOrShowInterstitial({
-      src,
-      edit: undefined,
+    // Load the imported source into the editable sandbox instead of the
+    // read-only ?src= URL mode. Seed cleanSongs["null"] with the new content
+    // so it is available after navigation regardless of whether the interstitial
+    // fires (the interstitial calls discardChanges → markSongClean → setQuery,
+    // at which point song() falls back to cleanSongs["null"]).
+    this.setState({
+      cleanSongs: {
+        ...this.state.cleanSongs,
+        null: { src, baseSHA: null },
+      },
+      mutopiaOpen: false,
     });
-    this.setState({ mutopiaOpen: false });
+    this.setQueryOrShowInterstitial({ src: undefined, edit: undefined });
   };
 
   private handleShowXmlImport = (): void => {
@@ -914,11 +950,16 @@ export default class App extends React.PureComponent<Props, State> {
   };
 
   private handleXmlImportResult = (src: string): void => {
-    this.setState({ xmlImportOpen: false });
-    this.setQueryOrShowInterstitial({
-      src,
-      edit: undefined,
+    // Same strategy as handleLoadSrc: put content in editable sandbox, not
+    // in the read-only ?src= URL param.
+    this.setState({
+      xmlImportOpen: false,
+      cleanSongs: {
+        ...this.state.cleanSongs,
+        null: { src, baseSHA: null },
+      },
     });
+    this.setQueryOrShowInterstitial({ src: undefined, edit: undefined });
   };
 
   private handleShowMakelily = async (
@@ -943,13 +984,15 @@ export default class App extends React.PureComponent<Props, State> {
   };
 
   private handleShowNew = (): void => {
-    this.setQueryOrShowInterstitial({
-      edit: undefined,
-      src: undefined,
-    });
+    this.setState({ localFilePath: null });
+    this.setQueryOrShowInterstitial({ edit: undefined, src: undefined });
   };
 
   private handleShowPublish = (): void => {
+    if (isDesktop()) {
+      void this.handleSaveLocalFile();
+      return;
+    }
     if (!this.props.auth) {
       this.setState({
         login: true,
@@ -964,6 +1007,10 @@ export default class App extends React.PureComponent<Props, State> {
   };
 
   private handleShowSaveAs = (): void => {
+    if (isDesktop()) {
+      void this.handleSaveLocalFileAs();
+      return;
+    }
     if (!this.props.auth) {
       this.setState({
         login: true,
@@ -981,6 +1028,67 @@ export default class App extends React.PureComponent<Props, State> {
       });
     }
   };
+
+  // ── Local file handlers (Electron Desktop only) ──────────────────────────
+
+  private handleOpenLocalFile = async (): Promise<void> => {
+    const result = await openFile();
+    if (!result) return;
+
+    // Directly replace sandbox content without showing the interstitial — the
+    // native file dialog already served as a "are you sure?" moment.
+    const songName = this.props.edit || "null";
+    this.props.markSongClean(songName);
+    this.setState({
+      cleanSongs: {
+        ...this.state.cleanSongs,
+        null: { src: result.content, baseSHA: null },
+      },
+      localFilePath: result.filePath,
+    });
+    this.props.setQuery({ src: undefined, edit: undefined });
+  };
+
+  private handleSaveLocalFile = async (): Promise<void> => {
+    const src = this.song()?.src;
+    if (src === undefined) return;
+
+    if (this.state.localFilePath) {
+      const ok = await saveFile(src, this.state.localFilePath);
+      if (ok) {
+        const songName = this.props.edit || "null";
+        this.props.markSongClean(songName);
+      }
+    } else {
+      // No file on disk yet → fall through to Save As.
+      await this.handleSaveLocalFileAs();
+    }
+  };
+
+  private handleSaveLocalFileAs = async (): Promise<void> => {
+    const src = this.song()?.src;
+    if (src === undefined) return;
+
+    const defaultName = this.state.localFilePath
+      ? this.state.localFilePath.replace(/.*[\\/]/, "") || "untitled.ly"
+      : "untitled.ly";
+
+    const result = await saveFileAs(src, defaultName);
+    if (result) {
+      this.setState({ localFilePath: result.filePath });
+      const songName = this.props.edit || "null";
+      this.props.markSongClean(songName);
+    }
+  };
+
+  private handleKeyDown = (e: KeyboardEvent): void => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "s" && isDesktop()) {
+      e.preventDefault();
+      void this.handleSaveLocalFile();
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   private handleSignIn = (): void => {
     this.setState({

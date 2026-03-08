@@ -1,6 +1,6 @@
 {
   "name": "hacklily-desktop",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "Hacklily Desktop app with local renderer (no Docker dependency for end users).",
   "main": "build/main.js",
