@@ -39,6 +39,7 @@ interface Props {
   onShowAbout(): void;
   onShowClone(): void;
   onShowMutopia(): void;
+  onShowXmlImport(): void;
   onShowOpen(): void;
   onShowNew(): void;
   onShowPublish(): void;
@@ -63,6 +64,7 @@ export default class FileMenu extends React.PureComponent<Props> {
       onShowAbout,
       onShowClone,
       onShowMutopia,
+      onShowXmlImport,
       onShowOpen,
       onExportLy,
       onExportMIDI,
@@ -137,7 +139,7 @@ export default class FileMenu extends React.PureComponent<Props> {
         <MenuItem
           icon="import"
           text="Import MusicXML&hellip;"
-          href="/musicxml2ly.html"
+          onClick={onShowXmlImport}
         />
         <MenuItem
           icon="floppy-disk"

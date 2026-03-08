@@ -43,6 +43,7 @@ import ModalLocked, {
 import ModalLogin from "./ModalLogin";
 import ModalOpen from "./ModalOpen";
 import MutopiaSelector from "./MutopiaSelector";
+import MusicXML2LyModal from "./musicxml2ly/MusicXML2LyModal";
 import ModalPublish, { doPublish, doUnpublish } from "./ModalPublish";
 import ModalSaving from "./ModalSaving";
 import ModalUnsavedChangesInterstitial from "./ModalUnsavedChangesInterstitial";
@@ -235,6 +236,7 @@ interface State {
   rendererVersion: "stable" | "unstable";
   open: boolean;
   mutopiaOpen: boolean;
+  xmlImportOpen: boolean;
   saving: boolean;
   showMakelily: typeof Makelily | null;
   windowWidth: number;
@@ -290,6 +292,7 @@ export default class App extends React.PureComponent<Props, State> {
     rendererVersion: "stable",
     open: false,
     mutopiaOpen: false,
+    xmlImportOpen: false,
     saving: false,
     showMakelily: null,
     windowWidth: window.innerWidth,
@@ -382,6 +385,7 @@ export default class App extends React.PureComponent<Props, State> {
         onShowClone={this.handleShowSaveAs}
         onShowMakelily={this.handleShowMakelily}
         onShowMutopia={this.handleShowMutopia}
+        onShowXmlImport={this.handleShowXmlImport}
         onShowNew={this.handleShowNew}
         onShowOpen={this.handleShowOpen}
         onShowPublish={this.handleShowPublish}
@@ -901,6 +905,22 @@ export default class App extends React.PureComponent<Props, State> {
     this.setState({ mutopiaOpen: false });
   };
 
+  private handleShowXmlImport = (): void => {
+    this.setState({ xmlImportOpen: true });
+  };
+
+  private handleHideXmlImport = (): void => {
+    this.setState({ xmlImportOpen: false });
+  };
+
+  private handleXmlImportResult = (src: string): void => {
+    this.setState({ xmlImportOpen: false });
+    this.setQueryOrShowInterstitial({
+      src,
+      edit: undefined,
+    });
+  };
+
   private handleShowMakelily = async (
     tool?: string,
     cb?: (ly: string) => void,
@@ -1148,6 +1168,7 @@ export default class App extends React.PureComponent<Props, State> {
       showMakelily,
       open,
       mutopiaOpen,
+      xmlImportOpen,
     } = this.state;
 
     const { about, auth, csrf, setCSRF, "404": _404, saveAs } = this.props;
@@ -1212,6 +1233,14 @@ export default class App extends React.PureComponent<Props, State> {
             onHide={this.handleHideOpen}
           />
         );
+      case xmlImportOpen:
+        return this.rpc ? (
+          <MusicXML2LyModal
+            rpc={this.rpc}
+            onHide={this.handleHideXmlImport}
+            onResult={this.handleXmlImportResult}
+          />
+        ) : null;
       case mutopiaOpen:
         return (
           <MutopiaSelector

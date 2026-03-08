@@ -56,7 +56,7 @@ function setupFrontendProtocol(frontendDir: string): void {
   session.defaultSession.protocol.handle(APP_SCHEME, async (request) => {
     const url = new URL(request.url);
     // url.pathname is already decoded and starts with "/"
-    const relPath = url.pathname.replace(/^\/+/, "");
+    const relPath = url.pathname.replace(/^\/+/, "") || "index.html";
     const filePath = path.join(frontendDir, relPath);
     return net.fetch(`file://${filePath}`);
   });

@@ -18,7 +18,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-import { Classes, Dialog } from "@blueprintjs/core";
+import { Classes, Dialog, Spinner, Callout } from "@blueprintjs/core";
 import React from "react";
 
 import RPCClient from "../RPCClient";
@@ -26,41 +26,92 @@ import RPCClient from "../RPCClient";
 interface Props {
   rpc: RPCClient;
   onHide(): void;
+  onResult(src: string): void;
 }
 
-export default class MusicXML2LyModal extends React.PureComponent<Props> {
+interface State {
+  loading: boolean;
+  error: string | null;
+}
+
+export default class MusicXML2LyModal extends React.PureComponent<Props, State> {
+  state: State = {
+    loading: false,
+    error: null,
+  };
+
   render(): JSX.Element {
+    const { loading, error } = this.state;
+
     return (
-      <Dialog title="Import MusicXML" isOpen={true} onClose={this.props.onHide}>
+      <Dialog
+        title="Import MusicXML"
+        isOpen={true}
+        onClose={loading ? undefined : this.props.onHide}
+        canOutsideClickClose={!loading}
+        canEscapeKeyClose={!loading}
+      >
         <div className={Classes.DIALOG_BODY}>
-          <p>Select a MusicXML file to import into Hacklily.</p>
-          <input type="file" value="" onChange={this.convert} />
+          {error && (
+            <Callout intent="danger" style={{ marginBottom: 12 }}>
+              {error}
+            </Callout>
+          )}
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "24px 0" }}>
+              <Spinner />
+              <p style={{ marginTop: 12 }}>Converting MusicXML&hellip;</p>
+            </div>
+          ) : (
+            <>
+              <p>Select a MusicXML file to import into Hacklily.</p>
+              <input type="file" accept=".xml,.musicxml,.mxl" onChange={this.convert} />
+            </>
+          )}
         </div>
       </Dialog>
     );
   }
 
   convert = (ev: React.ChangeEvent<HTMLInputElement>) => {
-    if (!ev.target.files) {
+    if (!ev.target.files || ev.target.files.length === 0) {
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      this.doLoad(reader.result as any);
+      void this.doLoad(reader.result as string);
       reader.onload = null;
     };
     reader.readAsText(ev.target.files[0]);
   };
 
-  doLoad = async (src: string) => {
-    console.log(src);
-    const rendered = await this.props.rpc.call("render", {
-      backend: "musicxml2ly",
-      version: "stable",
-      src,
-    });
-    const file = rendered.result.files[0];
-    alert(rendered.result.logs);
-    location.href = `/#src=${encodeURIComponent(file)}`;
+  doLoad = async (src: string): Promise<void> => {
+    this.setState({ loading: true, error: null });
+    try {
+      const rendered = await this.props.rpc.call("render", {
+        backend: "musicxml2ly",
+        version: "stable",
+        src,
+      });
+
+      const file: string | undefined = rendered.result?.files?.[0];
+      if (!file) {
+        this.setState({
+          loading: false,
+          error:
+            "Conversion failed: musicxml2ly did not produce any output.
+" +
+            (rendered.result?.logs ?? ""),
+        });
+        return;
+      }
+
+      // Success — pass the LilyPond source to the parent and close
+      this.props.onResult(file);
+    } catch (err: unknown) {
+      const rpcErr = err as { error?: { message?: string } };
+      const msg = rpcErr?.error?.message ?? (err instanceof Error ? err.message : "Unknown error during MusicXML conversion.");
+      this.setState({ loading: false, error: String(msg) });
+    }
   };
 }
