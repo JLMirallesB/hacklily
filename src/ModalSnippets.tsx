@@ -38,8 +38,8 @@ import React from "react";
 
 import { fetchUrl, readSnippetsFile, writeSnippetsFile } from "./electronBridge";
 
-const SNIPPETS_BASE = "https://lilypond.org/doc/v2.24/Documentation/snippets/";
-const SNIPPETS_INDEX = `${SNIPPETS_BASE}index`;
+const BIG_PAGE_URL =
+  "https://lilypond.org/doc/v2.24/Documentation/snippets-big-page.html";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,7 +47,8 @@ const SNIPPETS_INDEX = `${SNIPPETS_BASE}index`;
 
 interface OfficialCategory {
   name: string;
-  href: string;
+  /** Anchor id (e.g. "pitches"), matching <a name="pitches"> in the page. */
+  anchor: string;
 }
 
 interface OfficialSnippet {
@@ -73,16 +74,15 @@ interface Props {
 interface State {
   activeTab: string;
 
-  // --- Official snippets ---
+  // Official snippets — fetched once from the big page
   officialLoading: boolean;
   officialError: string | null;
   officialCategories: OfficialCategory[];
-  officialSelected: OfficialCategory | null;
-  officialSnippets: OfficialSnippet[];
-  officialSnippetsLoading: boolean;
-  officialSnippetsError: string | null;
+  /** All snippets keyed by category anchor, populated after the big-page fetch. */
+  officialAllSnippets: Record<string, OfficialSnippet[]>;
+  officialSelected: string | null; // selected anchor
 
-  // --- My snippets ---
+  // My snippets
   myLoading: boolean;
   mySnippets: MySnippets;
 
@@ -94,63 +94,103 @@ interface State {
 }
 
 // ---------------------------------------------------------------------------
-// HTML parsers
+// Big-page parser
 // ---------------------------------------------------------------------------
 
-function parseOfficialIndex(html: string): OfficialCategory[] {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const seen = new Set<string>();
-  const cats: OfficialCategory[] = [];
-
-  doc.querySelectorAll("a[href]").forEach((a) => {
-    const href = a.getAttribute("href") ?? "";
-    // Only local .html links (no slashes, no external URLs, no anchors)
-    if (
-      href.endsWith(".html") &&
-      !href.startsWith("http") &&
-      !href.includes("/") &&
-      !href.startsWith("#") &&
-      !seen.has(href)
-    ) {
-      seen.add(href);
-      const name = a.textContent?.trim() ?? href;
-      if (name) cats.push({ name, href });
-    }
-  });
-
-  return cats;
+interface ParsedBigPage {
+  categories: OfficialCategory[];
+  allSnippets: Record<string, OfficialSnippet[]>;
 }
 
-function parseOfficialCategory(html: string): OfficialSnippet[] {
+function parseBigPage(html: string): ParsedBigPage {
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const snippets: OfficialSnippet[] = [];
 
-  doc.querySelectorAll("pre.verbatim, pre.example").forEach((pre) => {
-    const code = pre.textContent?.trim() ?? "";
-    // Only include blocks that look like LilyPond source
-    if (!code.includes("\\") && !code.includes("{")) return;
+  // ── 1. TOC ─────────────────────────────────────────────────────────────────
+  // The table of contents lives in <table class="menu"> with anchor links like
+  // <a href="#pitches">Pitches</a>.
+  const categories: OfficialCategory[] = [];
+  const seenAnchors = new Set<string>();
 
-    // Walk upwards/backwards in the DOM to find the closest heading
-    let title = "Snippet";
-    let el: Element | null = pre;
-    outer: while (el) {
-      let sib: Element | null = el.previousElementSibling;
-      while (sib) {
-        if (/^h[2-6]$/i.test(sib.tagName)) {
-          // Strip leading numbering (e.g. "1.2.3 ")
-          title =
-            sib.textContent?.trim().replace(/^[\d.\s]+/, "") ?? title;
-          break outer;
-        }
-        sib = sib.previousElementSibling;
-      }
-      el = el.parentElement;
-    }
-
-    snippets.push({ title, code });
+  doc.querySelectorAll("table.menu a[href]").forEach((a) => {
+    const href = a.getAttribute("href") ?? "";
+    if (!href.startsWith("#")) return;
+    const anchor = href.slice(1);
+    // Skip meta-anchors (SEC_Contents, SEC_About…)
+    if (!anchor || anchor.startsWith("SEC_") || anchor === "index") return;
+    if (seenAnchors.has(anchor)) return;
+    const name = a.textContent?.trim() ?? "";
+    if (!name) return;
+    seenAnchors.add(anchor);
+    categories.push({ name, anchor });
   });
 
-  return snippets;
+  // ── 2. Snippets ────────────────────────────────────────────────────────────
+  // The page is one long flat document inside <div id="main">.
+  // Structure (simplified):
+  //   <a name="pitches"></a>
+  //   <h1 class="unnumbered">Pitches</h1>
+  //   …
+  //   <a name="pitches-adding-ambitus-per-voice"></a>
+  //   <h2 class="unnumberedsec">Adding ambitus per voice</h2>
+  //   <p>description</p>
+  //   <pre class="verbatim">…code…</pre>
+  //   …
+
+  const allSnippets: Record<string, OfficialSnippet[]> = {};
+  const mainEl = doc.getElementById("main") ?? doc.body;
+  const children = Array.from(mainEl.children);
+
+  let currentCategoryAnchor = "";
+  let pendingSnippetTitle = "";
+
+  for (let i = 0; i < children.length; i++) {
+    const el = children[i];
+
+    if (el.tagName === "H1" && el.classList.contains("unnumbered")) {
+      // The immediately preceding <a name="…"> (skipping nav tables / hr) is
+      // the category anchor.
+      for (let j = i - 1; j >= 0; j--) {
+        const prev = children[j];
+        if (prev.tagName === "TABLE" || prev.tagName === "HR") continue;
+        if (prev.tagName === "A") {
+          const name = prev.getAttribute("name") ?? "";
+          if (name && !name.startsWith("index-") && !name.startsWith("Top")) {
+            currentCategoryAnchor = name;
+            break;
+          }
+        }
+        break;
+      }
+      pendingSnippetTitle = "";
+      continue;
+    }
+
+    if (el.tagName === "H2" && el.classList.contains("unnumberedsec")) {
+      // Strip the "Category: " prefix that LilyPond adds (e.g. "Pitches: Adding…")
+      const raw = el.textContent?.trim() ?? "";
+      const colonIdx = raw.indexOf(": ");
+      pendingSnippetTitle = colonIdx >= 0 ? raw.slice(colonIdx + 2) : raw;
+      continue;
+    }
+
+    if (el.tagName === "PRE" && el.classList.contains("verbatim")) {
+      const code = el.textContent?.trim() ?? "";
+      if (currentCategoryAnchor && pendingSnippetTitle && code) {
+        if (!allSnippets[currentCategoryAnchor]) {
+          allSnippets[currentCategoryAnchor] = [];
+        }
+        allSnippets[currentCategoryAnchor].push({
+          title: pendingSnippetTitle,
+          code,
+        });
+      }
+      // Reset title so a second <pre> in the same entry doesn't duplicate.
+      pendingSnippetTitle = "";
+      continue;
+    }
+  }
+
+  return { categories, allSnippets };
 }
 
 // ---------------------------------------------------------------------------
@@ -176,9 +216,8 @@ function parseMySnippets(md: string): MySnippets {
     if (line.startsWith("## ")) {
       const name = line.slice(3).trim();
       i++;
-      // Advance to opening code fence
       while (i < lines.length && !lines[i].startsWith("```")) i++;
-      i++; // skip the ``` line
+      i++; // skip opening ```
       const codeLines: string[] = [];
       while (i < lines.length && !lines[i].startsWith("```")) {
         codeLines.push(lines[i]);
@@ -218,10 +257,8 @@ export default class ModalSnippets extends React.PureComponent<Props, State> {
     officialLoading: true,
     officialError: null,
     officialCategories: [],
+    officialAllSnippets: {},
     officialSelected: null,
-    officialSnippets: [],
-    officialSnippetsLoading: false,
-    officialSnippetsError: null,
 
     myLoading: false,
     mySnippets: {},
@@ -233,7 +270,7 @@ export default class ModalSnippets extends React.PureComponent<Props, State> {
   };
 
   componentDidMount(): void {
-    void this.loadOfficialIndex();
+    void this.loadBigPage();
     void this.loadMySnippets();
   }
 
@@ -286,17 +323,18 @@ export default class ModalSnippets extends React.PureComponent<Props, State> {
       officialError,
       officialCategories,
       officialSelected,
-      officialSnippets,
-      officialSnippetsLoading,
-      officialSnippetsError,
+      officialAllSnippets,
     } = this.state;
 
+    // ── Left panel: categories ──────────────────────────────────────────────
     let categoryContent: React.ReactNode;
     if (officialLoading) {
       categoryContent = (
         <div className={css(styles.center)}>
           <Spinner size={24} />
-          <p style={{ marginTop: 8, color: "#888" }}>Cargando…</p>
+          <p style={{ marginTop: 8, color: "#888", fontSize: "0.85em" }}>
+            Descargando snippets…
+          </p>
         </div>
       );
     } else if (officialError) {
@@ -309,7 +347,7 @@ export default class ModalSnippets extends React.PureComponent<Props, State> {
             <Button
               icon="refresh"
               small
-              onClick={() => void this.loadOfficialIndex()}
+              onClick={() => void this.loadBigPage()}
             >
               Reintentar
             </Button>
@@ -321,18 +359,21 @@ export default class ModalSnippets extends React.PureComponent<Props, State> {
         <Menu>
           {officialCategories.map((cat) => (
             <MenuItem
-              key={cat.href}
+              key={cat.anchor}
               text={cat.name}
-              active={officialSelected?.href === cat.href}
-              onClick={() => void this.loadOfficialCategory(cat)}
+              active={officialSelected === cat.anchor}
+              onClick={() => this.setState({ officialSelected: cat.anchor })}
             />
           ))}
         </Menu>
       );
     }
 
+    // ── Right panel: snippets ───────────────────────────────────────────────
     let snippetsContent: React.ReactNode;
-    if (!officialSelected) {
+    if (officialLoading) {
+      snippetsContent = null;
+    } else if (!officialSelected) {
       snippetsContent = (
         <NonIdealState
           icon="arrow-left"
@@ -340,49 +381,37 @@ export default class ModalSnippets extends React.PureComponent<Props, State> {
           description="Elige una categoría de la lista de la izquierda para ver sus snippets."
         />
       );
-    } else if (officialSnippetsLoading) {
-      snippetsContent = (
-        <div className={css(styles.center)}>
-          <Spinner size={24} />
-          <p style={{ marginTop: 8, color: "#888" }}>Cargando snippets…</p>
-        </div>
-      );
-    } else if (officialSnippetsError) {
-      snippetsContent = (
-        <NonIdealState
-          icon="error"
-          title="Error"
-          description={officialSnippetsError}
-        />
-      );
-    } else if (officialSnippets.length === 0) {
-      snippetsContent = (
-        <NonIdealState
-          icon="search"
-          title="Sin resultados"
-          description="No se encontraron snippets en esta categoría."
-        />
-      );
     } else {
-      snippetsContent = officialSnippets.map((snippet, idx) => (
-        <div key={idx} className={css(styles.snippetCard)}>
-          <div className={css(styles.snippetHeader)}>
-            <span className={css(styles.snippetTitle)}>{snippet.title}</span>
-            <Button
-              icon="import"
-              small
-              intent="primary"
-              onClick={() => this.handleLoadSnippet(snippet.code)}
-            >
-              Cargar
-            </Button>
+      const snippets = officialAllSnippets[officialSelected] ?? [];
+      if (snippets.length === 0) {
+        snippetsContent = (
+          <NonIdealState
+            icon="search"
+            title="Sin resultados"
+            description="No se encontraron snippets en esta categoría."
+          />
+        );
+      } else {
+        snippetsContent = snippets.map((snippet, idx) => (
+          <div key={idx} className={css(styles.snippetCard)}>
+            <div className={css(styles.snippetHeader)}>
+              <span className={css(styles.snippetTitle)}>{snippet.title}</span>
+              <Button
+                icon="import"
+                small
+                intent="primary"
+                onClick={() => this.handleLoadSnippet(snippet.code)}
+              >
+                Cargar
+              </Button>
+            </div>
+            <pre className={css(styles.codePreview)}>
+              {snippet.code.split("\n").slice(0, 6).join("\n")}
+              {snippet.code.split("\n").length > 6 ? "\n…" : ""}
+            </pre>
           </div>
-          <pre className={css(styles.codePreview)}>
-            {snippet.code.split("\n").slice(0, 6).join("\n")}
-            {snippet.code.split("\n").length > 6 ? "\n…" : ""}
-          </pre>
-        </div>
-      ));
+        ));
+      }
     }
 
     return (
@@ -543,60 +572,30 @@ export default class ModalSnippets extends React.PureComponent<Props, State> {
     this.props.onHide();
   };
 
-  private async loadOfficialIndex(): Promise<void> {
+  private async loadBigPage(): Promise<void> {
     this.setState({ officialLoading: true, officialError: null });
     try {
-      const result = await fetchUrl(SNIPPETS_INDEX);
+      const result = await fetchUrl(BIG_PAGE_URL);
       if (!result || !result.ok) {
         this.setState({
           officialLoading: false,
           officialError:
-            result?.text ??
             "No se pudo conectar al servidor de LilyPond. Comprueba la conexión a internet.",
         });
         return;
       }
-      const cats = parseOfficialIndex(result.text);
+      const { categories, allSnippets } = parseBigPage(result.text);
       this.setState({
         officialLoading: false,
-        officialCategories: cats,
-        officialError: cats.length === 0 ? "No se encontraron categorías." : null,
+        officialCategories: categories,
+        officialAllSnippets: allSnippets,
+        officialError:
+          categories.length === 0 ? "No se encontraron categorías." : null,
       });
     } catch (err) {
       this.setState({
         officialLoading: false,
         officialError: err instanceof Error ? err.message : "Error de red.",
-      });
-    }
-  }
-
-  private async loadOfficialCategory(cat: OfficialCategory): Promise<void> {
-    this.setState({
-      officialSelected: cat,
-      officialSnippetsLoading: true,
-      officialSnippetsError: null,
-      officialSnippets: [],
-    });
-    try {
-      const url = `${SNIPPETS_BASE}${cat.href}`;
-      const result = await fetchUrl(url);
-      if (!result || !result.ok) {
-        this.setState({
-          officialSnippetsLoading: false,
-          officialSnippetsError: "No se pudo cargar la categoría.",
-        });
-        return;
-      }
-      const snippets = parseOfficialCategory(result.text);
-      this.setState({
-        officialSnippetsLoading: false,
-        officialSnippets: snippets,
-      });
-    } catch (err) {
-      this.setState({
-        officialSnippetsLoading: false,
-        officialSnippetsError:
-          err instanceof Error ? err.message : "Error al cargar snippets.",
       });
     }
   }
