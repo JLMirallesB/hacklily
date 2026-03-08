@@ -1084,9 +1084,19 @@ export default class App extends React.PureComponent<Props, State> {
     const result = await openFile();
     if (!result) return;
 
+    // Diagnostic log — open DevTools (Ctrl+Shift+I) to see this.
+    const versionMatch = /\\version\s*"([^"]+)"/.exec(result.content);
+    const detectedVersion = versionMatch ? versionMatch[1] : "(none)";
+    const needsConvert = isOlderThanBundled(result.content);
+    console.info(
+      `[Hacklily 0.1.8] Opened: ${result.filePath}\n` +
+        `  \\version detected: ${detectedVersion}\n` +
+        `  isOlderThanBundled: ${needsConvert}`,
+    );
+
     // If the file was written for an older LilyPond version, ask the user
     // whether to run convert-ly before opening it.
-    if (isOlderThanBundled(result.content)) {
+    if (needsConvert) {
       this.setState({
         convertLyPending: { content: result.content, filePath: result.filePath },
       });
