@@ -893,6 +893,14 @@ export default class App extends React.PureComponent<Props, State> {
     this.setState({ mutopiaOpen: false });
   };
 
+  private handleLoadSrc = (src: string): void => {
+    this.setQueryOrShowInterstitial({
+      src,
+      edit: undefined,
+    });
+    this.setState({ mutopiaOpen: false });
+  };
+
   private handleShowMakelily = async (
     tool?: string,
     cb?: (ly: string) => void,
@@ -1207,7 +1215,7 @@ export default class App extends React.PureComponent<Props, State> {
       case mutopiaOpen:
         return (
           <MutopiaSelector
-            onLoadSong={this.handleLoadSong}
+            onLoadSrc={this.handleLoadSrc}
             onHide={this.handleHideMutopia}
           />
         );
