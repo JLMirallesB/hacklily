@@ -88,6 +88,60 @@ function isOlderThanBundled(content: string): boolean {
   return major < 2 || (major === 2 && minor < 24);
 }
 
+// ── \midi block helpers ──────────────────────────────────────────────────────
+
+/**
+ * Returns true if the LilyPond source already contains a \midi block,
+ * meaning the renderer will produce a MIDI file for playback.
+ */
+function hasMidiBlock(content: string): boolean {
+  return /\\midi\b/.test(content);
+}
+
+/**
+ * Insert a \midi { } block into the first \score { } block that does not
+ * already have one, so that LilyPond produces a MIDI file.
+ *
+ * Strategy (in order):
+ *   1. If a single-line \layout { … } exists, append \midi { } after it.
+ *   2. Otherwise walk the first \score { } block brace-by-brace and insert
+ *      before its closing }.
+ *
+ * Returns the original string unchanged if no safe insertion point is found.
+ */
+function addMidiBlock(content: string): string {
+  if (hasMidiBlock(content)) return content;
+
+  // ── Strategy 1: single-line \layout { … } ──────────────────────────────
+  // Matches \layout followed by a brace group with no nested braces.
+  const withLayout = content.replace(
+    /(\\layout\s*\{[^}]*\})/,
+    "$1\n  \\midi { }",
+  );
+  if (withLayout !== content) return withLayout;
+
+  // ── Strategy 2: brace-count walk inside the first \score { } ───────────
+  const scoreMatch = /\\score\s*\{/.exec(content);
+  if (scoreMatch) {
+    let depth = 0;
+    const start = scoreMatch.index + scoreMatch[0].length - 1; // opening {
+    for (let i = start; i < content.length; i++) {
+      if (content[i] === "{") depth++;
+      else if (content[i] === "}") {
+        depth--;
+        if (depth === 0) {
+          return (
+            content.slice(0, i) + "\n  \\midi { }\n" + content.slice(i)
+          );
+        }
+      }
+    }
+  }
+
+  // Cannot determine a safe insertion point — return unchanged.
+  return content;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -278,6 +332,11 @@ interface State {
   convertLyPending: { content: string; filePath: string | null } | null;
   /** Non-null when midi2ly failed — message is shown in an error Alert. */
   midiImportError: string | null;
+  /**
+   * True when the currently loaded source has no \midi block.
+   * A prompt banner is shown so the user can add one with one click.
+   */
+  midiPromptVisible: boolean;
   saving: boolean;
   showMakelily: typeof Makelily | null;
   windowWidth: number;
@@ -337,6 +396,7 @@ export default class App extends React.PureComponent<Props, State> {
     localFilePath: null,
     convertLyPending: null,
     midiImportError: null,
+    midiPromptVisible: false,
     saving: false,
     showMakelily: null,
     windowWidth: window.innerWidth,
@@ -396,6 +456,7 @@ export default class App extends React.PureComponent<Props, State> {
       rendererVersion,
       windowWidth,
       midiImportError,
+      midiPromptVisible,
     } = this.state;
 
     const {
@@ -497,6 +558,38 @@ export default class App extends React.PureComponent<Props, State> {
               {midiImportError}
             </pre>
           </Alert>
+        )}
+        {midiPromptVisible && (
+          <div
+            style={{
+              padding: "6px 12px",
+              background: "#dce9f5",
+              borderBottom: "1px solid #b5cce0",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+            }}
+          >
+            <Icon icon="music" size={14} color="#106ba3" />
+            <span style={{ flex: 1 }}>
+              This score has no <code>\midi {"{ }"}</code> block. Add one to
+              enable MIDI playback.
+            </span>
+            <Button
+              small
+              intent={Intent.PRIMARY}
+              onClick={this.handleAddMidiBlock}
+            >
+              Add \midi {"{ }"}
+            </Button>
+            <Button
+              small
+              minimal
+              icon="cross"
+              onClick={() => this.setState({ midiPromptVisible: false })}
+            />
+          </div>
         )}
         <div className="content">
           <Editor
@@ -1017,6 +1110,7 @@ export default class App extends React.PureComponent<Props, State> {
       },
       convertLyPending: null,
       localFilePath: null,
+      midiPromptVisible: !hasMidiBlock(content),
     });
     this.setQueryOrShowInterstitial({ src: undefined, edit: undefined });
   };
@@ -1037,6 +1131,25 @@ export default class App extends React.PureComponent<Props, State> {
       return;
     }
     this._loadSandboxContent(result.content);
+  };
+
+  /**
+   * Insert a \midi { } block into the current song source so that LilyPond
+   * generates a MIDI file during rendering, enabling in-app playback.
+   */
+  private handleAddMidiBlock = (): void => {
+    const song = this.song();
+    if (!song) return;
+
+    const newSrc = addMidiBlock(song.src);
+    const key = this.props.edit || "null";
+    this.setState((state) => ({
+      cleanSongs: {
+        ...state.cleanSongs,
+        [key]: { ...(state.cleanSongs[key] ?? { baseSHA: null }), src: newSrc },
+      },
+      midiPromptVisible: false,
+    }));
   };
 
   private handleHideXmlImport = (): void => {
@@ -1140,6 +1253,7 @@ export default class App extends React.PureComponent<Props, State> {
       },
       localFilePath: filePath,
       convertLyPending: null,
+      midiPromptVisible: !hasMidiBlock(content),
     });
     this.props.setQuery({ src: undefined, edit: undefined });
   };
