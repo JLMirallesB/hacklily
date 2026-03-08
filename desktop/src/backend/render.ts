@@ -82,11 +82,7 @@ async function collectFiles(sessionDir: string, extension: string): Promise<stri
   const mapped: string[] = [];
   for (const name of files) {
     const filePath = path.join(sessionDir, name);
-    if (extension === ".svg") {
-      mapped.push(await fs.readFile(filePath, "utf8"));
-    } else {
-      mapped.push((await fs.readFile(filePath)).toString("base64"));
-    }
+    mapped.push((await fs.readFile(filePath)).toString("base64"));
   }
 
   return mapped;
@@ -123,9 +119,10 @@ async function runLilypond(
 
     await fs.writeFile(sourceFile, renderedSrc, "utf8");
 
+    const extraArgs = backend === "png" ? ["-fpng"] : [];
     const result = await runCommand(
       lilypondBin,
-      ["-dpoint-and-click=#f", "-o", outputPrefix, sourceFile],
+      ["-dpoint-and-click=#f", ...extraArgs, "-o", outputPrefix, sourceFile],
       workDir,
       LILYPOND_TIMEOUT_MS,
     );
@@ -151,7 +148,7 @@ async function runLilypond(
       };
     }
 
-    const extension = backend === "svg" ? ".svg" : ".pdf";
+    const extension = backend === "svg" ? ".svg" : backend === "png" ? ".png" : ".pdf";
 
     return {
       files: await collectFiles(workDir, extension),

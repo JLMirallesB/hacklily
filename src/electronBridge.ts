@@ -51,6 +51,12 @@ export interface ImportMidiResult {
   logs: string;
 }
 
+export interface NetFetchResult {
+  ok: boolean;
+  status: number;
+  text: string;
+}
+
 interface ElectronAPI {
   openFile(): Promise<OpenFileResult | null>;
   saveFile(content: string, filePath: string): Promise<boolean>;
@@ -60,6 +66,9 @@ interface ElectronAPI {
   ): Promise<SaveFileResult | null>;
   convertLy(content: string): Promise<ConvertLyResult | null>;
   importMidi?(): Promise<ImportMidiResult | { error: string } | null>;
+  fetchUrl?(url: string): Promise<NetFetchResult>;
+  readSnippetsFile?(): Promise<string | null>;
+  writeSnippetsFile?(content: string): Promise<boolean>;
 }
 
 function getAPI(): ElectronAPI | null {
@@ -114,4 +123,24 @@ export async function importMidi(): Promise<
   ImportMidiResult | { error: string } | null
 > {
   return (await getAPI()?.importMidi?.()) ?? null;
+}
+
+/**
+ * Fetch a URL via the Electron main process, bypassing renderer CORS restrictions.
+ * Returns null when not running in Electron.
+ */
+export async function fetchUrl(
+  url: string,
+): Promise<NetFetchResult | null> {
+  return (await getAPI()?.fetchUrl?.(url)) ?? null;
+}
+
+/** Read the user's personal snippets markdown file. Returns null if not found or not in desktop mode. */
+export async function readSnippetsFile(): Promise<string | null> {
+  return (await getAPI()?.readSnippetsFile?.()) ?? null;
+}
+
+/** Write the user's personal snippets markdown file. Returns false if not in desktop mode. */
+export async function writeSnippetsFile(content: string): Promise<boolean> {
+  return (await getAPI()?.writeSnippetsFile?.(content)) ?? false;
 }

@@ -83,6 +83,7 @@ interface Props {
   onModeChanged(mode: ViewMode): void;
   onShowClone(): void;
   onShowMakelily(tool: string): void;
+  onShowSnippets(): void;
   onShowMutopia(): void;
   onShowXmlImport(): void;
   onImportMidi(): void;
@@ -163,6 +164,7 @@ export default class Header extends React.PureComponent<Props> {
       onShowOpen,
       onShowNew,
       onShowPublish,
+      onShowSnippets,
       onSignIn,
       onSignOut,
       online,
@@ -302,6 +304,11 @@ export default class Header extends React.PureComponent<Props> {
                   Insert
                 </Button>
               </Popover>
+            )}
+            {windowWidth >= MIN_BOTH_WIDTH && (
+              <Button icon="bookmark" onClick={onShowSnippets}>
+                Snippets
+              </Button>
             )}
             {viewMode}
             {played && midi != null ? this.renderTime() : playButton}

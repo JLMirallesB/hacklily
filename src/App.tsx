@@ -54,6 +54,7 @@ import MutopiaSelector from "./MutopiaSelector";
 import MusicXML2LyModal from "./musicxml2ly/MusicXML2LyModal";
 import ModalPublish, { doPublish, doUnpublish } from "./ModalPublish";
 import ModalSaving from "./ModalSaving";
+import ModalSnippets from "./ModalSnippets";
 import ModalUnsavedChangesInterstitial from "./ModalUnsavedChangesInterstitial";
 import Preview from "./Preview";
 import RPCClient from "./RPCClient";
@@ -320,6 +321,7 @@ interface State {
   reconnectTimeout: number;
   rendererVersion: "stable" | "unstable";
   open: boolean;
+  snippetsOpen: boolean;
   mutopiaOpen: boolean;
   xmlImportOpen: boolean;
   /** Absolute path of the currently open local .ly file, or null if none. */
@@ -391,6 +393,7 @@ export default class App extends React.PureComponent<Props, State> {
     reconnectTimeout: NaN,
     rendererVersion: "stable",
     open: false,
+    snippetsOpen: false,
     mutopiaOpen: false,
     xmlImportOpen: false,
     localFilePath: null,
@@ -513,6 +516,7 @@ export default class App extends React.PureComponent<Props, State> {
         onModeChanged={this.handleModeChanged}
         onShowClone={this.handleShowSaveAs}
         onShowMakelily={this.handleShowMakelily}
+        onShowSnippets={this.handleShowSnippets}
         onShowMutopia={this.handleShowMutopia}
         onShowXmlImport={this.handleShowXmlImport}
         onImportMidi={this.handleImportMidi}
@@ -1169,6 +1173,14 @@ export default class App extends React.PureComponent<Props, State> {
     this.setState({ mutopiaOpen: false });
   };
 
+  private handleShowSnippets = (): void => {
+    this.setState({ snippetsOpen: true });
+  };
+
+  private handleHideSnippets = (): void => {
+    this.setState({ snippetsOpen: false });
+  };
+
   private handleLoadSrc = (src: string): void => {
     // If the source was written for an older LilyPond version, offer convert-ly
     // before loading. filePath is null because this content came from Mutopia
@@ -1640,6 +1652,7 @@ export default class App extends React.PureComponent<Props, State> {
       saving,
       showMakelily,
       open,
+      snippetsOpen,
       mutopiaOpen,
       xmlImportOpen,
       convertLyPending,
@@ -1752,6 +1765,14 @@ export default class App extends React.PureComponent<Props, State> {
             onResult={this.handleXmlImportResult}
           />
         ) : null;
+      case snippetsOpen:
+        return (
+          <ModalSnippets
+            currentCode={song?.src ?? ""}
+            onLoadSrc={this.handleLoadSrc}
+            onHide={this.handleHideSnippets}
+          />
+        );
       case mutopiaOpen:
         return (
           <MutopiaSelector

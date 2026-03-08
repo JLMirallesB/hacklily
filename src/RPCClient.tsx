@@ -131,7 +131,7 @@ export interface BaseRPCResponse {
 // -------------------------------------------------------------------------
 
 export interface RenderParams {
-  backend: "svg" | "pdf" | "musicxml2ly";
+  backend: "svg" | "pdf" | "png" | "musicxml2ly";
   src: string;
   version?: "stable" | "unstable";
 }

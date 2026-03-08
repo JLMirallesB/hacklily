@@ -333,6 +333,49 @@ ipcMain.handle(
   },
 );
 
+// ── Snippets & net fetch IPC ─────────────────────────────────────────────────
+
+ipcMain.handle(
+  "net:fetch",
+  async (_event, url: string): Promise<{ ok: boolean; status: number; text: string }> => {
+    try {
+      const response = await net.fetch(url, {
+        headers: { "User-Agent": "Hacklily-Desktop/1.0" },
+      });
+      const text = await response.text();
+      return { ok: response.ok, status: response.status, text };
+    } catch (err) {
+      return {
+        ok: false,
+        status: 0,
+        text: err instanceof Error ? err.message : "Network error",
+      };
+    }
+  },
+);
+
+ipcMain.handle("snippets:read", async (): Promise<string | null> => {
+  const filePath = path.join(app.getPath("userData"), "snippets.md");
+  try {
+    return await fs.readFile(filePath, "utf8");
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle(
+  "snippets:write",
+  async (_event, content: string): Promise<boolean> => {
+    const filePath = path.join(app.getPath("userData"), "snippets.md");
+    try {
+      await fs.writeFile(filePath, content, "utf8");
+      return true;
+    } catch {
+      return false;
+    }
+  },
+);
+
 // ────────────────────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {

@@ -27,7 +27,7 @@ function isRenderParams(value: unknown): value is RenderParams {
 
   const { backend, src } = value as Partial<RenderParams>;
   const validBackend =
-    backend === "svg" || backend === "pdf" || backend === "musicxml2ly";
+    backend === "svg" || backend === "pdf" || backend === "png" || backend === "musicxml2ly";
   return validBackend && typeof src === "string";
 }
 

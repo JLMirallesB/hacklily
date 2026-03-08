@@ -26,6 +26,12 @@ export interface ImportMidiResult {
   logs: string;
 }
 
+export interface NetFetchResult {
+  ok: boolean;
+  status: number;
+  text: string;
+}
+
 contextBridge.exposeInMainWorld("electronAPI", {
   /** Show native Open dialog and return {filePath, content}, or null if cancelled. */
   openFile: (): Promise<OpenFileResult | null> =>
@@ -49,4 +55,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   /** Show native Open dialog for .mid/.midi, run midi2ly, return LilyPond source. */
   importMidi: (): Promise<ImportMidiResult | { error: string } | null> =>
     ipcRenderer.invoke("file:importMidi"),
+
+  /** Fetch a URL via the main process (bypasses renderer CORS restrictions). */
+  fetchUrl: (url: string): Promise<NetFetchResult> =>
+    ipcRenderer.invoke("net:fetch", url),
+
+  /** Read the user's personal snippets file. Returns null if not found. */
+  readSnippetsFile: (): Promise<string | null> =>
+    ipcRenderer.invoke("snippets:read"),
+
+  /** Write the user's personal snippets file. Returns true on success. */
+  writeSnippetsFile: (content: string): Promise<boolean> =>
+    ipcRenderer.invoke("snippets:write", content),
 });

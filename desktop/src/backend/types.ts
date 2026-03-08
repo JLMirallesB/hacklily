@@ -1,4 +1,4 @@
-export type RenderBackend = "svg" | "pdf" | "musicxml2ly";
+export type RenderBackend = "svg" | "pdf" | "png" | "musicxml2ly";
 
 export interface RenderParams {
   backend: RenderBackend;
