@@ -99,8 +99,7 @@ export default class MusicXML2LyModal extends React.PureComponent<Props, State> 
         this.setState({
           loading: false,
           error:
-            "Conversion failed: musicxml2ly did not produce any output.
-" +
+            "Conversion failed: musicxml2ly did not produce any output. " +
             (rendered.result?.logs ?? ""),
         });
         return;
