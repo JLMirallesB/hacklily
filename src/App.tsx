@@ -272,8 +272,9 @@ interface State {
   /**
    * When set, a file was opened whose \version is older than the bundled
    * LilyPond. The dialog asks the user whether to run convert-ly first.
+   * filePath is null when the source came from Mutopia (no local file).
    */
-  convertLyPending: { content: string; filePath: string } | null;
+  convertLyPending: { content: string; filePath: string | null } | null;
   saving: boolean;
   showMakelily: typeof Makelily | null;
   windowWidth: number;
@@ -956,17 +957,38 @@ export default class App extends React.PureComponent<Props, State> {
   };
 
   private handleLoadSrc = (src: string): void => {
+    // If the source was written for an older LilyPond version, offer convert-ly
+    // before loading. filePath is null because this content came from Mutopia
+    // (it has not been saved to disk yet).
+    if (isOlderThanBundled(src)) {
+      this.setState({
+        convertLyPending: { content: src, filePath: null },
+        mutopiaOpen: false,
+      });
+      return;
+    }
+
     // Load the imported source into the editable sandbox instead of the
     // read-only ?src= URL mode. Seed cleanSongs["null"] with the new content
     // so it is available after navigation regardless of whether the interstitial
     // fires (the interstitial calls discardChanges → markSongClean → setQuery,
     // at which point song() falls back to cleanSongs["null"]).
+    this._loadSandboxContent(src);
+  };
+
+  /**
+   * Load content into the editable sandbox (no local file path).
+   * Used by Mutopia imports and by the convert-ly dialog when the source
+   * did not originate from a local .ly file.
+   */
+  private _loadSandboxContent = (content: string): void => {
     this.setState({
       cleanSongs: {
         ...this.state.cleanSongs,
-        null: { src, baseSHA: null },
+        null: { src: content, baseSHA: null },
       },
-      mutopiaOpen: false,
+      convertLyPending: null,
+      localFilePath: null,
     });
     this.setQueryOrShowInterstitial({ src: undefined, edit: undefined });
   };
@@ -1114,17 +1136,29 @@ export default class App extends React.PureComponent<Props, State> {
     const result = await convertLy(pending.content);
     // If convert-ly succeeds use the updated source; fall back to original
     // if the binary is missing or the conversion failed.
-    this._loadLocalFile(
-      result ? result.converted : pending.content,
-      pending.filePath,
-    );
+    let finalContent = result ? result.converted : pending.content;
+
+    // Post-process: \deprecateddim is a placeholder that convert-ly inserts
+    // when it cannot automatically convert an old \dim command. Replace it
+    // with \> (decrescendo hairpin), which is the correct modern equivalent.
+    finalContent = finalContent.replace(/\\deprecateddim/g, "\\>");
+
+    if (pending.filePath !== null) {
+      this._loadLocalFile(finalContent, pending.filePath);
+    } else {
+      this._loadSandboxContent(finalContent);
+    }
   };
 
   /** User chose "Open As-Is" — load without running convert-ly. */
   private handleConvertLySkip = (): void => {
     const pending = this.state.convertLyPending;
     if (!pending) return;
-    this._loadLocalFile(pending.content, pending.filePath);
+    if (pending.filePath !== null) {
+      this._loadLocalFile(pending.content, pending.filePath);
+    } else {
+      this._loadSandboxContent(pending.content);
+    }
   };
 
   /** User dismissed the dialog — do not open the file. */
