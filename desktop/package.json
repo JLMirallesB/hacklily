@@ -1,6 +1,6 @@
 {
   "name": "hacklily-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Hacklily Desktop app with local renderer (no Docker dependency for end users).",
   "main": "build/main.js",
@@ -51,7 +51,12 @@
     "mac": {
       "category": "public.app-category.music",
       "target": [
-        { "target": "dmg", "arch": ["x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "win": {
