@@ -91,6 +91,8 @@ interface Props {
   onExportLy(): any;
   onExportMIDI(): any;
   onExportPDF(): any;
+  onExportSVG(): any;
+  onExportPNG(): any;
   onShowPublish(): void;
   onDeleteSong(song: string): void;
   onLoadSong(song: string): void;
@@ -150,6 +152,8 @@ export default class Header extends React.PureComponent<Props> {
       onExportLy,
       onExportMIDI,
       onExportPDF,
+      onExportSVG,
+      onExportPNG,
       onLoadSong,
       onShowAbout,
       onShowClone,
@@ -243,6 +247,8 @@ export default class Header extends React.PureComponent<Props> {
                   onExportLy={onExportLy}
                   onExportMIDI={onExportMIDI}
                   onExportPDF={onExportPDF}
+                  onExportSVG={onExportSVG}
+                  onExportPNG={onExportPNG}
                   onLoadSong={onLoadSong}
                   onShowAbout={onShowAbout}
                   onShowClone={onShowClone}

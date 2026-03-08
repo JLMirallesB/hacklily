@@ -534,6 +534,8 @@ export default class App extends React.PureComponent<Props, State> {
         onExportLy={this.handleExportLy}
         onExportMIDI={this.handleExportMIDI}
         onExportPDF={this.handleExportPDF}
+        onExportSVG={this.handleExportSVG}
+        onExportPNG={this.handleExportPNG}
         songURL={songURL}
         localFileName={localFileName}
       />
@@ -903,6 +905,96 @@ export default class App extends React.PureComponent<Props, State> {
       `${name}.ly`,
       "data:text/plain;charset=utf-8," + encodeURIComponent(song.src),
     );
+  };
+
+  private handleExportSVG = async (): Promise<void> => {
+    const song = this.song();
+    if (!song) {
+      alert("Could not export SVG.");
+      return;
+    }
+    const rpc = this.rpc;
+    if (!rpc) {
+      alert("Could not connect to server.");
+      return;
+    }
+    const name = this.getSongName();
+    try {
+      let version: "unstable" | "stable" = "stable";
+      const maybeVersion = /\\version\s*"(\d+)\.?(\d+)?\.?(\d+)?/gm.exec(
+        song.src,
+      );
+      const versionSlices = maybeVersion
+        ? maybeVersion.slice(1).map((v) => parseInt(v, 10))
+        : [];
+      const isUnstable = versionSlices[0] === 2 && versionSlices[1] > 22;
+      version = isUnstable ? "unstable" : "stable";
+
+      const files: string[] = (
+        await rpc.call("render", { version, backend: "svg", src: song.src })
+      ).result.files;
+
+      if (files.length === 1) {
+        this.triggerDownload(
+          `${name}.svg`,
+          "data:image/svg+xml;base64," + files[0],
+        );
+      } else {
+        files.forEach((file, i) => {
+          this.triggerDownload(
+            `${name}-page${i + 1}.svg`,
+            "data:image/svg+xml;base64," + file,
+          );
+        });
+      }
+    } catch (err) {
+      alert("Could not export SVG.");
+    }
+  };
+
+  private handleExportPNG = async (): Promise<void> => {
+    const song = this.song();
+    if (!song) {
+      alert("Could not export PNG.");
+      return;
+    }
+    const rpc = this.rpc;
+    if (!rpc) {
+      alert("Could not connect to server.");
+      return;
+    }
+    const name = this.getSongName();
+    try {
+      let version: "unstable" | "stable" = "stable";
+      const maybeVersion = /\\version\s*"(\d+)\.?(\d+)?\.?(\d+)?/gm.exec(
+        song.src,
+      );
+      const versionSlices = maybeVersion
+        ? maybeVersion.slice(1).map((v) => parseInt(v, 10))
+        : [];
+      const isUnstable = versionSlices[0] === 2 && versionSlices[1] > 22;
+      version = isUnstable ? "unstable" : "stable";
+
+      const files: string[] = (
+        await rpc.call("render", { version, backend: "png", src: song.src })
+      ).result.files;
+
+      if (files.length === 1) {
+        this.triggerDownload(
+          `${name}.png`,
+          "data:image/png;base64," + files[0],
+        );
+      } else {
+        files.forEach((file, i) => {
+          this.triggerDownload(
+            `${name}-page${i + 1}.png`,
+            "data:image/png;base64," + file,
+          );
+        });
+      }
+    } catch (err) {
+      alert("Could not export PNG.");
+    }
   };
 
   private handleHideHelp = (): void => {

@@ -35,6 +35,8 @@ interface Props {
   onExportLy(): any;
   onExportMIDI(): any;
   onExportPDF(): any;
+  onExportSVG(): any;
+  onExportPNG(): any;
   onDeleteSong(song: string): void;
   onLoadSong(song: string): void;
   onShowAbout(): void;
@@ -72,6 +74,8 @@ export default class FileMenu extends React.PureComponent<Props> {
       onExportLy,
       onExportMIDI,
       onExportPDF,
+      onExportSVG,
+      onExportPNG,
       onShowNew,
       onShowPublish,
       songURL,
@@ -134,23 +138,27 @@ export default class FileMenu extends React.PureComponent<Props> {
           text="Open&hellip;"
           onClick={onShowOpen}
         />
-        <MenuItem
-          icon="music"
-          text="Browse MutopiaProject&hellip;"
-          onClick={onShowMutopia}
-        />
-        <MenuItem
-          icon="import"
-          text="Import MusicXML&hellip;"
-          onClick={onShowXmlImport}
-        />
-        {isDesktop() && (
+        {/* ── Import submenu ────────────────────────────────────────── */}
+        <MenuItem icon="import" text="Import">
           <MenuItem
             icon="music"
-            text="Import MIDI&hellip;"
-            onClick={onImportMidi}
+            text="Browse MutopiaProject&hellip;"
+            onClick={onShowMutopia}
           />
-        )}
+          <MenuItem
+            icon="code"
+            text="Import MusicXML&hellip;"
+            onClick={onShowXmlImport}
+          />
+          {isDesktop() && (
+            <MenuItem
+              icon="music"
+              text="Import MIDI&hellip;"
+              onClick={onImportMidi}
+            />
+          )}
+        </MenuItem>
+        <MenuDivider />
         <MenuItem
           icon="floppy-disk"
           text="Save"
@@ -163,9 +171,14 @@ export default class FileMenu extends React.PureComponent<Props> {
           onClick={onShowClone}
           disabled={!canSaveAs}
         />
+        {/* ── Export submenu ────────────────────────────────────────── */}
         <MenuItem icon="download" text="Export" disabled={!canExport}>
           <MenuItem onClick={onExportLy} icon="code" text="LilyPond source" />
+          <MenuDivider />
           <MenuItem onClick={onExportPDF} icon="document-share" text="PDF" />
+          <MenuItem onClick={onExportSVG} icon="shapes" text="SVG" />
+          <MenuItem onClick={onExportPNG} icon="media" text="PNG" />
+          <MenuDivider />
           <MenuItem onClick={onExportMIDI} icon="music" text="MIDI" />
           {songURL && <MenuDivider />}
           {songURL && (
