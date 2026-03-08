@@ -221,6 +221,12 @@ async function runMusicXml2Ly(
       };
     }
 
+    // Post-process: musicxml2ly emits \key <pitch> \none for atonal/unkeyed
+    // music (MusicXML mode="none"). \none is not a valid LilyPond mode and
+    // causes a parse error. Remove these directives — LilyPond defaults to
+    // no accidentals when no \key is present, which is the correct behaviour.
+    out = out.replace(/\\key\s+\S+\s+\\none\b/g, "");
+
     return {
       files: [out],
       logs,
