@@ -8,7 +8,9 @@ import {
   session,
   shell,
 } from "electron";
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import { startRpcServer } from "./backend/rpcServer";
@@ -35,6 +37,7 @@ protocol.registerSchemesAsPrivileged([
 
 let mainWindow: BrowserWindow | null = null;
 let stopServer: null | (() => Promise<void>) = null;
+let runtimeDir: string | null = null;
 
 function resolveFrontendDir(): string {
   if (app.isPackaged) {
@@ -114,7 +117,7 @@ function createWindow(frontendDir: string): void {
 }
 
 async function bootstrap(): Promise<void> {
-  const runtimeDir = resolveRuntimeDir();
+  runtimeDir = resolveRuntimeDir();
   const frontendDir = resolveFrontendDir();
 
   setupFrontendProtocol(frontendDir);
@@ -196,6 +199,71 @@ ipcMain.handle(
 
     await fs.writeFile(result.filePath, content, "utf8");
     return { filePath: result.filePath };
+  },
+);
+
+interface ConvertLyIpcResult {
+  converted: string;
+  changed: boolean;
+  logs: string;
+}
+
+ipcMain.handle(
+  "file:convertLy",
+  async (_event, { content }: { content: string }): Promise<ConvertLyIpcResult | null> => {
+    if (!runtimeDir) return null;
+
+    // convert-ly is a Python script in the LilyPond bundle — no .exe suffix.
+    const convertLyBin = path.join(runtimeDir, "bin", "convert-ly");
+    try {
+      await fs.access(convertLyBin);
+    } catch {
+      return null; // binary not present in this runtime
+    }
+
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "hacklily-cly-"));
+    try {
+      const inputPath = path.join(tmpDir, "input.ly");
+      await fs.writeFile(inputPath, content, "utf8");
+
+      // Extend PATH so convert-ly can find the bundled lilypond if needed.
+      const binDir = path.join(runtimeDir, "bin");
+      const pathSep = process.platform === "win32" ? ";" : ":";
+      const extPath = `${binDir}${pathSep}${process.env.PATH ?? ""}`;
+
+      return await new Promise<ConvertLyIpcResult | null>((resolve) => {
+        let stdout = "";
+        let stderr = "";
+
+        const child = spawn(convertLyBin, [inputPath], {
+          env: { ...process.env, PATH: extPath },
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+
+        child.stdout.on("data", (chunk: Buffer) => {
+          stdout += chunk.toString();
+        });
+        child.stderr.on("data", (chunk: Buffer) => {
+          stderr += chunk.toString();
+        });
+
+        child.on("error", () => resolve(null));
+
+        child.on("close", (code) => {
+          if (code !== 0 || !stdout.trim()) {
+            resolve(null);
+            return;
+          }
+          resolve({
+            converted: stdout,
+            changed: stdout.trimEnd() !== content.trimEnd(),
+            logs: stderr.trim(),
+          });
+        });
+      });
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   },
 );
 

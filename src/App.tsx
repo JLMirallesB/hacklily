@@ -18,7 +18,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-import { Icon } from "@blueprintjs/core";
+import { Button, Classes, Dialog, Icon } from "@blueprintjs/core";
 import { css } from "aphrodite";
 import Makelily from "makelily"; // note: use for types only
 import * as monacoEditor from "monaco-editor";
@@ -26,6 +26,7 @@ import React from "react";
 
 import { Auth, checkLogin, revokeGitHubAuth } from "./auth";
 import {
+  convertLy,
   isDesktop,
   openFile,
   saveFile,
@@ -64,6 +65,29 @@ function last<T>(t: T[]): T {
 const INITIAL_WS_COOLOFF: number = 2;
 const BACKEND_WS_URL: string | undefined = process.env.REACT_APP_BACKEND_WS_URL;
 const PUBLIC_READONLY: string = "PUBLIC_READONLY";
+
+// ── convert-ly helpers ───────────────────────────────────────────────────────
+
+/** Extract the version string from a \version "X.Y.Z" directive, or null. */
+function parseLyVersion(content: string): string | null {
+  const match = /\\version\s*"([^"]+)"/.exec(content);
+  return match ? match[1] : null;
+}
+
+/**
+ * Returns true if the file's \version directive is older than the bundled
+ * LilyPond (2.24.x), meaning convert-ly may be able to update it.
+ * Returns false when there is no \version directive (assume current).
+ */
+function isOlderThanBundled(content: string): boolean {
+  const match = /\\version\s*"(\d+)\.(\d+)/.exec(content);
+  if (!match) return false;
+  const major = parseInt(match[1], 10);
+  const minor = parseInt(match[2], 10);
+  return major < 2 || (major === 2 && minor < 24);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 /**
  * Properties derived from URL.
@@ -245,6 +269,11 @@ interface State {
   xmlImportOpen: boolean;
   /** Absolute path of the currently open local .ly file, or null if none. */
   localFilePath: string | null;
+  /**
+   * When set, a file was opened whose \version is older than the bundled
+   * LilyPond. The dialog asks the user whether to run convert-ly first.
+   */
+  convertLyPending: { content: string; filePath: string } | null;
   saving: boolean;
   showMakelily: typeof Makelily | null;
   windowWidth: number;
@@ -302,6 +331,7 @@ export default class App extends React.PureComponent<Props, State> {
     mutopiaOpen: false,
     xmlImportOpen: false,
     localFilePath: null,
+    convertLyPending: null,
     saving: false,
     showMakelily: null,
     windowWidth: window.innerWidth,
@@ -1031,22 +1061,65 @@ export default class App extends React.PureComponent<Props, State> {
 
   // ── Local file handlers (Electron Desktop only) ──────────────────────────
 
-  private handleOpenLocalFile = async (): Promise<void> => {
-    const result = await openFile();
-    if (!result) return;
-
-    // Directly replace sandbox content without showing the interstitial — the
-    // native file dialog already served as a "are you sure?" moment.
+  /**
+   * Shared loading logic: seed the sandbox with `content` and navigate to it.
+   * The native file dialog already served as the "are you sure?" moment, so we
+   * skip the unsaved-changes interstitial by marking the song clean first.
+   */
+  private _loadLocalFile = (content: string, filePath: string): void => {
     const songName = this.props.edit || "null";
     this.props.markSongClean(songName);
     this.setState({
       cleanSongs: {
         ...this.state.cleanSongs,
-        null: { src: result.content, baseSHA: null },
+        null: { src: content, baseSHA: null },
       },
-      localFilePath: result.filePath,
+      localFilePath: filePath,
+      convertLyPending: null,
     });
     this.props.setQuery({ src: undefined, edit: undefined });
+  };
+
+  private handleOpenLocalFile = async (): Promise<void> => {
+    const result = await openFile();
+    if (!result) return;
+
+    // If the file was written for an older LilyPond version, ask the user
+    // whether to run convert-ly before opening it.
+    if (isOlderThanBundled(result.content)) {
+      this.setState({
+        convertLyPending: { content: result.content, filePath: result.filePath },
+      });
+      return;
+    }
+
+    this._loadLocalFile(result.content, result.filePath);
+  };
+
+  /** User chose "Update Syntax" — run convert-ly, then load the result. */
+  private handleConvertLyConfirm = async (): Promise<void> => {
+    const pending = this.state.convertLyPending;
+    if (!pending) return;
+
+    const result = await convertLy(pending.content);
+    // If convert-ly succeeds use the updated source; fall back to original
+    // if the binary is missing or the conversion failed.
+    this._loadLocalFile(
+      result ? result.converted : pending.content,
+      pending.filePath,
+    );
+  };
+
+  /** User chose "Open As-Is" — load without running convert-ly. */
+  private handleConvertLySkip = (): void => {
+    const pending = this.state.convertLyPending;
+    if (!pending) return;
+    this._loadLocalFile(pending.content, pending.filePath);
+  };
+
+  /** User dismissed the dialog — do not open the file. */
+  private handleConvertLyCancel = (): void => {
+    this.setState({ convertLyPending: null });
   };
 
   private handleSaveLocalFile = async (): Promise<void> => {
@@ -1277,6 +1350,7 @@ export default class App extends React.PureComponent<Props, State> {
       open,
       mutopiaOpen,
       xmlImportOpen,
+      convertLyPending,
     } = this.state;
 
     const { about, auth, csrf, setCSRF, "404": _404, saveAs } = this.props;
@@ -1289,6 +1363,43 @@ export default class App extends React.PureComponent<Props, State> {
         return <ModalLocked />;
       case _404 !== undefined:
         return <Modal404 onHide={this.handleClear404} />;
+      case convertLyPending !== null: {
+        const version =
+          parseLyVersion(convertLyPending!.content) ?? "an older version";
+        return (
+          <Dialog
+            isOpen={true}
+            onClose={this.handleConvertLyCancel}
+            title="Update LilyPond Syntax?"
+            icon="code"
+          >
+            <div className={Classes.DIALOG_BODY}>
+              <p>
+                This file was written for LilyPond{" "}
+                <strong>{version}</strong>. The bundled renderer is{" "}
+                <strong>2.24</strong>.
+              </p>
+              <p>
+                Running <code>convert-ly</code> can automatically update the
+                syntax. The original file on disk will not be changed until you
+                save.
+              </p>
+            </div>
+            <div className={Classes.DIALOG_FOOTER}>
+              <div className={Classes.DIALOG_FOOTER_ACTIONS}>
+                <Button onClick={this.handleConvertLyCancel}>Cancel</Button>
+                <Button onClick={this.handleConvertLySkip}>Open As-Is</Button>
+                <Button
+                  intent="primary"
+                  onClick={this.handleConvertLyConfirm}
+                >
+                  Update Syntax
+                </Button>
+              </div>
+            </div>
+          </Dialog>
+        );
+      }
       case saving:
         return <ModalSaving />;
       case conflict:

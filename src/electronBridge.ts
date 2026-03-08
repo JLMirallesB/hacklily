@@ -35,6 +35,15 @@ export interface SaveFileResult {
   filePath: string;
 }
 
+export interface ConvertLyResult {
+  /** The updated LilyPond source after running convert-ly. */
+  converted: string;
+  /** True if convert-ly actually modified the source. */
+  changed: boolean;
+  /** Any warnings/messages printed to stderr by convert-ly. */
+  logs: string;
+}
+
 interface ElectronAPI {
   openFile(): Promise<OpenFileResult | null>;
   saveFile(content: string, filePath: string): Promise<boolean>;
@@ -42,6 +51,7 @@ interface ElectronAPI {
     content: string,
     defaultName?: string,
   ): Promise<SaveFileResult | null>;
+  convertLy(content: string): Promise<ConvertLyResult | null>;
 }
 
 function getAPI(): ElectronAPI | null {
@@ -74,4 +84,14 @@ export async function saveFileAs(
   defaultName?: string,
 ): Promise<SaveFileResult | null> {
   return (await getAPI()?.saveFileAs(content, defaultName)) ?? null;
+}
+
+/**
+ * Run convert-ly on the given LilyPond source to update old syntax.
+ * Returns null if convert-ly is unavailable or the conversion failed.
+ */
+export async function convertLy(
+  content: string,
+): Promise<ConvertLyResult | null> {
+  return (await getAPI()?.convertLy(content)) ?? null;
 }
