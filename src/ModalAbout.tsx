@@ -32,8 +32,12 @@ interface Props {
   onHide(): void;
 }
 
+const APP_VERSION = process.env.REACT_APP_VERSION ?? "";
+const RELEASES_URL = "https://github.com/JLMirallesB/hacklily/releases/latest";
+const SOURCE_URL = "https://github.com/JLMirallesB/hacklily";
+
 /**
- * The About dialog, accessible through the menu in the header.
+ * The About dialog for Hacklily Desktop.
  */
 class ModalAbout extends React.PureComponent<Props> {
   render(): JSX.Element {
@@ -42,42 +46,50 @@ class ModalAbout extends React.PureComponent<Props> {
         icon="info-sign"
         isOpen={true}
         onClose={this.props.onHide}
-        title="About Hacklily"
+        title="About Hacklily Desktop"
         className={css(styles.modal)}
       >
         <div className={Classes.DIALOG_BODY}>
           <p className={Classes.TEXT_LARGE}>
-            <strong>
-              Hacklily is an online sheet-music editor and publishing tool.
-            </strong>
+            <strong>Hacklily Desktop</strong>
+            {APP_VERSION && (
+              <span
+                className={Classes.TEXT_MUTED}
+                style={{ fontWeight: "normal", marginLeft: 8 }}
+              >
+                v{APP_VERSION}
+              </span>
+            )}
           </p>
           <p>
-            It is powered by{" "}
+            Editor de partituras{" "}
             <a
               href="http://lilypond.org/"
               target="_blank"
               rel="noopener noreferrer"
             >
               LilyPond
-            </a>
-            . New to LilyPond? Take a look at the{" "}
+            </a>{" "}
+            que funciona <strong>completamente offline</strong>. El renderizado
+            se realiza en local, sin depender de servidores externos. Incluye
+            un explorador integrado de{" "}
             <a
-              href="http://lilypond.org/doc/v2.18/Documentation/learning/index"
-              rel="noopener noreferrer"
+              href="https://www.mutopiaproject.org/"
               target="_blank"
+              rel="noopener noreferrer"
             >
-              tutorial
+              MutopiaProject
             </a>
-            !
+            .
           </p>
           <p>
-            You can view Hacklily&apos;s source and contribute code on{" "}
+            ¿Nuevo en LilyPond? Consulta el{" "}
             <a
-              href="https://github.com/emilyskidsister/hacklily"
+              href="http://lilypond.org/doc/v2.18/Documentation/learning/index"
               target="_blank"
               rel="noopener noreferrer"
             >
-              GitHub
+              tutorial oficial
             </a>
             .
           </p>
@@ -86,58 +98,84 @@ class ModalAbout extends React.PureComponent<Props> {
             style={{ position: "relative" }}
           >
             <p>
-              This project is{" "}
-              <a href="https://www.fsf.org/about/what-is-free-software">
-                free software
-              </a>
-              : you can redistribute it and/or modify it under the terms of the
-              GNU General Public License (GNU GPL) as published by the Free
-              Software Foundation, either version 3 of the License, or (at your
-              option) any later version. The code is distributed WITHOUT ANY
-              WARRANTY; without even the implied warranty of MERCHANTABILITY or
-              FITNESS FOR A PARTICULAR PURPOSE. See the GNU GPL for more
-              details.
-            </p>
-            <p>
-              <a href="https://www.gnu.org/licenses/gpl-3.0.html">
-                Read the GNU General Public License version 3.
-                <span className={css(styles.gpl)}>
-                  <img
-                    src="gplv3-127x51.png"
-                    alt="Licensed under the GNU General Public License version 3"
-                  />
-                </span>
-              </a>
-            </p>
-            <p style={{ marginBottom: 0 }}>
-              {/* about-javascript.html contains the jslicense1 rel for scrapers */}
-              See{" "}
-              <a href="about-javascript.html">additional license statements</a>,{" "}
-              <a href="dmca.html">DMCA info</a>, and{" "}
-              <a href="privacy-statement.html">privacy statement</a>.
-              <br />
-              &copy; Copyright{" "}
+              Fork del proyecto original{" "}
+              <a
+                href="https://github.com/emilyskidsister/hacklily"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Hacklily
+              </a>{" "}
+              de{" "}
               <a
                 href="https://nettek.ca"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Jocelyn Stericker
-              </a>{" "}
-              2017 - present. 🇨🇦
+              </a>
+              .
+              <br />
+              Versión de escritorio creada por{" "}
+              <a
+                href="https://www.jlmirall.es"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                José Luis Miralles Bono
+              </a>
+              .
+            </p>
+            <p>
+              <a
+                href="https://ko-fi.com/miralles"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                ☕ Invítame a un café en Ko-fi
+              </a>
+            </p>
+            <p style={{ marginBottom: 0 }}>
+              Este proyecto es{" "}
+              <a
+                href="https://www.fsf.org/about/what-is-free-software"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                software libre
+              </a>
+              , distribuido bajo los términos de la GNU GPL v3 o posterior.{" "}
+              <a
+                href="https://www.gnu.org/licenses/gpl-3.0.html"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="gplv3-127x51.png"
+                  alt="GNU GPL v3"
+                  style={{ verticalAlign: "middle", marginLeft: 6 }}
+                />
+              </a>
             </p>
           </div>
         </div>
         <div className={Classes.DIALOG_FOOTER}>
           <div className={Classes.DIALOG_FOOTER_ACTIONS}>
-            <Button onClick={this.props.onHide}>Close</Button>
+            <Button onClick={this.props.onHide}>Cerrar</Button>
             <AnchorButton
-              href="http://lilypond.org/doc/v2.18/Documentation/learning/index"
+              href={SOURCE_URL}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Código fuente
+            </AnchorButton>
+            <AnchorButton
+              href={RELEASES_URL}
               intent={Intent.PRIMARY}
               rel="noopener noreferrer"
               target="_blank"
             >
-              Start Tutorial
+              Buscar actualizaciones
             </AnchorButton>
           </div>
         </div>
@@ -151,13 +189,5 @@ export default ModalAbout;
 const styles = StyleSheet.create({
   modal: {
     width: 565,
-  },
-  gpl: {
-    "@media (max-width: 530px)": {
-      display: "none",
-    },
-    position: "absolute",
-    bottom: 0,
-    right: 0,
   },
 });

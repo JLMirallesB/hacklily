@@ -1,175 +1,89 @@
-# Hacklily
+<div align="center">
+  <img src="desktop/assets/icon.png" width="160" alt="Hacklily Desktop icon" />
 
-Hacklily is an online sheet-music editor and publishing tool. [Start writing music now!](https://hacklily.org)
+  # Hacklily Desktop
 
-It consists of a frontend [Lilypond](http://lilypond.org/) editor using [monaco](https://github.com/microsoft/monaco-editor)
-(the editor that powers vscode) and a backend Lilypond renderer. It can publish songs directly to GitHub.
+  **Editor offline de partituras LilyPond — sin servidores externos**
 
-## Running locally
+  [![Última versión](https://img.shields.io/github/v/release/JLMirallesB/hacklily?label=descargar&style=for-the-badge&logo=github)](https://github.com/JLMirallesB/hacklily/releases/latest)
+  [![Licencia: GPL v3](https://img.shields.io/badge/Licencia-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
 
-### Dependencies
+</div>
 
-> **Important**: You do not need to install anything to run Hacklily in your browser. Hacklily supports all major browsers. To use it, just go to [https://www.hacklily.org](https://www.hacklily.org). The instructions below are for if you want to contribute to Hacklily or run the Hacklily development server _locally_.
+---
 
-You need:
+**Hacklily Desktop** es una aplicación de escritorio para macOS y Windows que permite editar y renderizar partituras escritas en [LilyPond](http://lilypond.org/) **completamente sin conexión a internet**. El renderizado se realiza de forma local, sin depender de ningún servidor externo.
 
-- [Node](https://nodejs.org/en/) -- tested with Node 7, earlier versions may or may not also work
-- [Yarn](https://yarnpkg.com/lang/en/docs/install/)
-- [Qt 5](https://www.qt.io/) -- with qmake in your path (installing using the version from Qt's website is recommended on macOS)
-- [Docker](https://www.docker.com/)
+> ¿Prefieres usar la versión web? El proyecto original funciona online en **[hacklily.org](https://www.hacklily.org)** — no necesitas instalar nada.
 
-Note: I haven't tested this on Windows yet. Theoretically, this should work with something like MSYS, but I have not tried.
-If you manage to get it working, please make a pull request with instructions on how to do that.
+---
 
-### Obtaining
+## ✨ Características
 
-To get hacklily, run:
+- 🎼 **Editor Monaco** (el mismo que alimenta VS Code) con resaltado de sintaxis LilyPond
+- ⚡ **Renderizado 100% local** — LilyPond se ejecuta en tu máquina, sin servidores
+- 🎵 **Reproducción MIDI** integrada
+- 📂 **Explorador de MutopiaProject** — navega y abre directamente partituras del repositorio público [MutopiaProject](https://www.mutopiaproject.org/), con resolución automática de dependencias entre archivos
+- 📤 Exporta a **PDF**, **MIDI** y **LilyPond** `.ly`
+- 🌙 Tema claro y oscuro
+- 🖥️ Disponible para **macOS** (Intel/Rosetta) y **Windows**
 
-```bash
-git clone git@github.com:emilyskidsister/hacklily.git
-```
+---
 
-Or, if you do not have ssh auth setup with Github:
+## 📥 Descargar
 
-```bash
-git clone https://github.com/emilyskidsister/hacklily.git
-```
+👉 [**Descargar la última versión**](https://github.com/JLMirallesB/hacklily/releases/latest)
 
-### Running (without GitHub integration)
+| Plataforma | Formato |
+|------------|---------|
+| macOS | `.dmg` (x86_64 / Rosetta 2 en Apple Silicon) |
+| Windows | `.exe` (instalador NSIS) |
 
-Once you have installed the above dependencies, run
+> **macOS**: Si el sistema advierte que la app está dañada, ejecuta en Terminal:
+> ```bash
+> xattr -cr "/Applications/Hacklily Desktop.app"
+> ```
 
-```bash
-make serve
-```
+---
 
-### Running (with GitHub integration)
+## 🗒️ Explorador de MutopiaProject
 
-**For most development, the steps in "Running" (above) are sufficient**.
+[MutopiaProject](https://www.mutopiaproject.org/) es un repositorio de miles de partituras en formato LilyPond, de libre distribución. Hacklily Desktop incluye un explorador integrado (menú **File → Browse MutopiaProject…**) que permite navegar el catálogo, abrir cualquier partitura y renderizarla al instante — incluso las que están divididas en múltiples archivos (cuartetos, orquesta…), que se ensamblan automáticamente.
 
-If you specifically wish to test integration with GitHub, follow the steps in this section.
+---
 
-First, create a GitHub organization by following the steps at https://github.com/organizations/new.
-Select the free plan.
+## 🛠️ Desarrollado sobre
 
-Next, create a new app at https://github.com/organizations/<your-new-repo-name>/settings/applications,
-making note of the client ID and secret. This application will be used to allow users to log in.
+- **[Hacklily](https://github.com/emilyskidsister/hacklily)** — el editor web original, creado por [Jocelyn Stericker](https://nettek.ca). Esta aplicación de escritorio es un fork del proyecto original.
+- **[LilyPond](http://lilypond.org/)** — el motor de grabado musical de código abierto.
+- **[MutopiaProject](https://www.mutopiaproject.org/)** — repositorio de partituras libres en LilyPond.
+- **[Electron](https://www.electronjs.org/)** — para empaquetar la app como ejecutable de escritorio.
+- **[Monaco Editor](https://microsoft.github.io/monaco-editor/)** — editor de código con soporte LilyPond.
 
-To run the frontend, in one shell run:
+---
 
-```bash
-cd hacklily
-yarn
-env \
-  REACT_APP_GITHUB_CLIENT_ID=your_github_api_client_id_here \
-  REACT_APP_BACKEND_WS_URL=ws://localhost:2000 \
-  yarn start
-```
+## 👤 Autoría del fork
 
-At this point, you should be able to navigate to `http://localhost:3000` to see the app, but you
-will get an error in the preview pane since the server is not running.
+Este fork ha sido creado por **José Luis Miralles Bono** · [jlmirall.es](https://www.jlmirall.es)
 
-In another shell, to run the backend, run:
+Si la aplicación te resulta útil, puedes invitarme a un café ☕:
 
-```bash
-cd hacklily/server
-mkdir build
-cd build
-qmake ../ws-server
-make
-./ws-server \
-  --renderer-path ../renderer \
-  --renderer-docker-tag hacklily-renderer \
-  --github-client-id your_github_api_client_id_here \
-  --github-secret your_github_api_secret_here \
-  --ws-port 2000
-```
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/miralles)
 
-You can omit the `github-*` arguments if you do not want to enable the GitHub integration.
+---
 
-`ws-port` should match the port of the `REACT_APP_BACKEND_WS_URL` you entered above.
+## 📜 Licencia
 
-Then, in a browser navigate to [http://localhost:3000](http://localhost:3000).
+Por respeto al proyecto LilyPond del que depende Hacklily, y para garantizar que todos los forks permanezcan como software libre, el cliente está licenciado bajo la **GNU GPL versión 3 o posterior**, y el servidor bajo la **GNU AGPL versión 3 o posterior**.
 
-## Contributing
+El código fuente original es © 2017 - present [Jocelyn Stericker](https://nettek.ca).
+Las modificaciones de escritorio son © 2024 - present [José Luis Miralles Bono](https://www.jlmirall.es).
 
-Please do! Fork this repo and submit a PR. Your submission must be under the appropriate
-license (GPL for client code, AGPL for server code).
+Consulta [LICENSE.txt](LICENSE.txt) para la GPL completa y [LICENSE.AGPL.txt](LICENSE.AGPL.txt) para la AGPL.
 
-You can reach the maintainer by email at `jocelyn@nettek.ca`.
+---
 
-## License
+## 🤝 Contribuir
 
-Out of respect for the Lilypond project that Hacklily relies on, and
-to ensure all forks of Hacklily remain free software, the client is
-licensed under the terms of the GNU GPL version 3 or later (with
-additional permissions as described below), and the server is licensed
-under the terms of the GNU AGPL version 3 or later.
-
-### Client
-
-Everything except for the server (located in `server/`) is licensed as follows:
-
-```
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-As additional permission under GNU GPL version 3 section 7, you
-may distribute non-source (e.g., minimized or compacted) forms of
-that code without the copy of the GNU GPL normally required by
-section 4, provided you include this license notice and a URL
-through which recipients can access the Corresponding Source.
-
-As additional permission under GNU GPL version 3 section 7,
-the term "System Libraries" is extended to include the JavaScript
-libraries provided with any browser. If you modify this code, you
-may extend this exception to your version of the code, but you are
-not obligated to do so. If you do not wish to do so, delete this
-exception statement from your version.
-```
-
-A full copy of the GPL version 3 is available in LICENSE.txt.
-
-### Server
-
-The server (located in `server/`) is licensed as follows:
-
-```
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-```
-
-A full copy of the AGPL version 3 is available in LICENSE.AGPL.txt.
-
-## Deployment
-
-Whenever a commit is pushed to master, Netlify will deploy a new version.
-
-## Offline desktop binaries (Option 2)
-
-If you want installable **Hacklily Desktop** binaries for non-technical users (DMG/EXE without Docker), see:
-
-- `desktop/README.md`
-- `DESKTOP_RELEASE_GUIDE.es.md`
-- `.github/workflows/create-desktop-release-tag.yml`
-- `.github/workflows/desktop-release.yml`
+¡Las contribuciones son bienvenidas! Haz un fork, abre un _issue_ o envía un PR.
+El código fuente del fork está en: [github.com/JLMirallesB/hacklily](https://github.com/JLMirallesB/hacklily)

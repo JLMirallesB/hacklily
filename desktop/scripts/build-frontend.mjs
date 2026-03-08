@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,11 +25,16 @@ function run(command, args, options = {}) {
   });
 }
 
+const desktopPkg = JSON.parse(
+  readFileSync(path.resolve(__dirname, "../package.json"), "utf8"),
+);
+
 const webpackBin = path.resolve(repoRoot, "node_modules", "webpack", "bin", "webpack.js");
 const env = {
   ...process.env,
   REACT_APP_BACKEND_WS_URL: process.env.REACT_APP_BACKEND_WS_URL || "ws://127.0.0.1:3210",
   REACT_APP_GITHUB_CLIENT_ID: process.env.REACT_APP_GITHUB_CLIENT_ID || "",
+  REACT_APP_VERSION: desktopPkg.version,
 };
 
 await run("node", [webpackBin], {

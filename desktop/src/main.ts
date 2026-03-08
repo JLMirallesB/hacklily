@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, net, protocol, session } from "electron";
+import { app, BrowserWindow, dialog, net, protocol, session, shell } from "electron";
 import path from "node:path";
 
 import { startRpcServer } from "./backend/rpcServer";
@@ -81,6 +81,21 @@ function createWindow(frontendDir: string): void {
   //   fetch("/hackmidi/samples/x") → app://frontend/hackmidi/samples/x
   //   which our protocol handler maps to frontendDir/hackmidi/samples/x
   void mainWindow.loadURL(`${APP_SCHEME}://frontend/index.html`);
+
+  // Open external https:// links in the system browser instead of Electron.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      void shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!url.startsWith(`${APP_SCHEME}://`)) {
+      event.preventDefault();
+      void shell.openExternal(url);
+    }
+  });
 
   mainWindow.on("closed", () => {
     mainWindow = null;

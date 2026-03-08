@@ -88,7 +88,31 @@ export default class FileMenu extends React.PureComponent<Props> {
     );
 
     const about: React.ReactNode = (
-      <MenuItem onClick={onShowAbout} text="About Hacklily" icon="info-sign" />
+      <MenuItem
+        onClick={onShowAbout}
+        text="About Hacklily Desktop"
+        icon="info-sign"
+      />
+    );
+
+    const checkUpdates: React.ReactNode = (
+      <MenuItem
+        href="https://github.com/JLMirallesB/hacklily/releases/latest"
+        target="_blank"
+        rel="noopener noreferrer"
+        text="Check for updates&hellip;"
+        icon="updated"
+      />
+    );
+
+    const sourceCode: React.ReactNode = (
+      <MenuItem
+        href="https://github.com/JLMirallesB/hacklily"
+        target="_blank"
+        rel="noopener noreferrer"
+        text="Source code&hellip;"
+        icon="git-branch"
+      />
     );
 
     return (
@@ -145,6 +169,8 @@ export default class FileMenu extends React.PureComponent<Props> {
         {signOut}
         <MenuDivider />
         {tutorial}
+        {checkUpdates}
+        {sourceCode}
         {about}
       </Menu>
     );

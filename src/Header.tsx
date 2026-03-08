@@ -202,7 +202,12 @@ export default class Header extends React.PureComponent<Props> {
             <img src={logoSvg} className={css(styles.logo)} alt="" />
           )}
           {windowWidth >= MIN_BOTH_WIDTH && (
-            <div className={Classes.NAVBAR_HEADING}>Hacklily</div>
+            <div className={Classes.NAVBAR_HEADING}>
+              Hacklily Desktop{" "}
+              <span style={{ fontSize: "0.75em", opacity: 0.6 }}>
+                v{process.env.REACT_APP_VERSION ?? ""}
+              </span>
+            </div>
           )}
           {windowWidth >= MIN_BOTH_WIDTH && <NavbarDivider />}
           <ButtonGroup>
