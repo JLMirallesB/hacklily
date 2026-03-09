@@ -230,6 +230,11 @@ async function runMusicXml2Ly(
     // no accidentals when no \key is present, which is the correct behaviour.
     out = out.replace(/\\key\s+\S+\s+\\none\b/g, "");
 
+    // musicxml2ly may also emit bare XML closing tags (e.g. </parameter>) for
+    // MusicXML elements it does not convert. The sequence "</" is never valid
+    // LilyPond, so stripping these lines is always safe.
+    out = out.replace(/^[^\S\n]*<\/[\w][\w:-]*>\s*\n?/gm, "");
+
     return {
       files: [out],
       logs,
