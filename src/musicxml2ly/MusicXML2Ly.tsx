@@ -23,6 +23,7 @@ import React from "react";
 const INITIAL_WS_COOLOFF: number = 2;
 const BACKEND_WS_URL: string | undefined = process.env.REACT_APP_BACKEND_WS_URL;
 
+import { withBackendToken } from "../electronBridge";
 import "../index.css";
 import RPCClient from "../RPCClient";
 import MusicXML2LyModal from "./MusicXML2LyModal";
@@ -77,7 +78,7 @@ export default class App extends React.PureComponent<{}, State> {
 
       return;
     }
-    this.socket = new WebSocket(BACKEND_WS_URL);
+    this.socket = new WebSocket(withBackendToken(BACKEND_WS_URL));
 
     this.socket.addEventListener("open", this.handleWSOpen);
     this.socket.addEventListener("error", this.handleWSError);

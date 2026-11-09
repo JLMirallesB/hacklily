@@ -20,6 +20,7 @@
 
 import React from "react";
 
+import { withBackendToken } from "../electronBridge";
 import RPCClient, { Status as ServerStatus } from "../RPCClient";
 
 const INITIAL_WS_COOLOFF: number = 1;
@@ -86,7 +87,7 @@ export default class Status extends React.Component<{}, State> {
 
       return;
     }
-    this.socket = new WebSocket(BACKEND_WS_URL);
+    this.socket = new WebSocket(withBackendToken(BACKEND_WS_URL));
 
     this.socket.addEventListener("open", this.handleWSOpen);
     this.socket.addEventListener("error", this.handleWSError);

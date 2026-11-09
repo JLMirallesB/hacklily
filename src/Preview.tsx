@@ -246,9 +246,7 @@ export default class Preview extends React.PureComponent<Props, State> {
           ? `${root.scrollHeight}px`
           : "0";
 
-      root.innerHTML = DOMPurify.sanitize(files.join(""), {
-        ALLOW_UNKNOWN_PROTOCOLS: true,
-      } as object);
+      root.innerHTML = DOMPurify.sanitize(files.join(""));
 
       this.props.onLogsObtained(logs, version);
       if (midi !== this.previousMIDIData) {

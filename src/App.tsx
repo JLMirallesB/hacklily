@@ -32,6 +32,7 @@ import {
   openFile,
   saveFile,
   saveFileAs,
+  withBackendToken,
 } from "./electronBridge";
 import Editor from "./Editor";
 import { cat, FileNotFound, getDefaultBranch, getOrCreateRepo } from "./gitfs";
@@ -633,7 +634,7 @@ export default class App extends React.PureComponent<Props, State> {
 
       return;
     }
-    this.socket = new WebSocket(BACKEND_WS_URL);
+    this.socket = new WebSocket(withBackendToken(BACKEND_WS_URL));
 
     this.socket.addEventListener("open", this.handleWSOpen);
     this.socket.addEventListener("error", this.handleWSError);

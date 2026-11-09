@@ -1,4 +1,6 @@
+import { timingSafeEqual } from "node:crypto";
 import fs from "node:fs/promises";
+import type { IncomingMessage } from "node:http";
 import path from "node:path";
 
 import { WebSocket, WebSocketServer } from "ws";
@@ -29,6 +31,20 @@ function isRenderParams(value: unknown): value is RenderParams {
   const validBackend =
     backend === "svg" || backend === "pdf" || backend === "png" || backend === "musicxml2ly";
   return validBackend && typeof src === "string";
+}
+
+function hasValidToken(requestUrl: string | undefined, expected: string): boolean {
+  const given = new URL(requestUrl ?? "/", "ws://127.0.0.1").searchParams.get("token");
+  if (!given) {
+    return false;
+  }
+
+  const givenBytes = Buffer.from(given);
+  const expectedBytes = Buffer.from(expected);
+  return (
+    givenBytes.length === expectedBytes.length &&
+    timingSafeEqual(givenBytes, expectedBytes)
+  );
 }
 
 function send(socket: WebSocket, payload: JsonRpcResponse): void {
@@ -82,7 +98,16 @@ export async function startRpcServer(config: RuntimeConfig): Promise<() => Promi
     queued: 0,
   };
 
-  const wss = new WebSocketServer({ host: "127.0.0.1", port: config.wsPort });
+  // LilyPond executes the Scheme embedded in a score and has no safe mode, so
+  // whoever reaches this socket can run commands as the user. Browsers let any
+  // web page open a WebSocket to localhost, hence both checks.
+  const wss = new WebSocketServer({
+    host: "127.0.0.1",
+    port: config.wsPort,
+    verifyClient: ({ origin, req }: { origin: string; req: IncomingMessage }) =>
+      origin === config.allowedOrigin &&
+      hasValidToken(req.url, config.authToken),
+  });
 
   let renderQueue = Promise.resolve();
 

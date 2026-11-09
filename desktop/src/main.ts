@@ -9,14 +9,39 @@ import {
   shell,
 } from "electron";
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { startRpcServer } from "./backend/rpcServer";
 
 const WS_PORT = 3210;
+const WS_TOKEN = randomBytes(32).toString("hex");
 const APP_SCHEME = "app";
+const APP_HOST = "frontend";
+const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`;
+
+const OFFICIAL_SNIPPETS_URL =
+  "https://lilypond.org/doc/v2.24/Documentation/snippets-big-page.html";
+
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  // data: is for the synthesizer's WebAssembly module, embedded in hackmidi.
+  `connect-src 'self' data: ws://127.0.0.1:${WS_PORT}`,
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join("; ");
+
+// Paths the user picked in a native dialog; file:save may only write to these.
+const userChosenPaths = new Set<string>();
 
 // Must be called before app is ready.
 // Registers "app://" as a standard secure scheme so that:
@@ -66,12 +91,30 @@ function resolveRuntimeDir(): string {
 }
 
 function setupFrontendProtocol(frontendDir: string): void {
+  const root = path.resolve(frontendDir);
+
   session.defaultSession.protocol.handle(APP_SCHEME, async (request) => {
     const url = new URL(request.url);
-    // url.pathname is already decoded and starts with "/"
-    const relPath = url.pathname.replace(/^\/+/, "") || "index.html";
-    const filePath = path.join(frontendDir, relPath);
-    return net.fetch(`file://${filePath}`);
+    let relPath: string;
+    try {
+      relPath = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html";
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    const filePath = path.resolve(root, relPath);
+    if (url.host !== APP_HOST || !filePath.startsWith(root + path.sep)) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    const response = await net.fetch(pathToFileURL(filePath).toString());
+    if (!filePath.endsWith(".html")) {
+      return response;
+    }
+
+    const headers = new Headers(response.headers);
+    headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+    return new Response(response.body, { status: response.status, headers });
   });
 }
 
@@ -87,6 +130,7 @@ function createWindow(frontendDir: string): void {
       nodeIntegration: false,
       sandbox: true,
       preload: path.join(__dirname, "preload.js"),
+      additionalArguments: [`--hacklily-ws-token=${WS_TOKEN}`],
     },
   });
 
@@ -94,7 +138,7 @@ function createWindow(frontendDir: string): void {
   // The page is served at app://frontend/index.html, meaning:
   //   fetch("/hackmidi/samples/x") → app://frontend/hackmidi/samples/x
   //   which our protocol handler maps to frontendDir/hackmidi/samples/x
-  void mainWindow.loadURL(`${APP_SCHEME}://frontend/index.html`);
+  void mainWindow.loadURL(`${APP_ORIGIN}/index.html`);
 
   // Open external https:// links in the system browser instead of Electron.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -105,8 +149,12 @@ function createWindow(frontendDir: string): void {
   });
 
   mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (!url.startsWith(`${APP_SCHEME}://`)) {
-      event.preventDefault();
+    if (url.startsWith(`${APP_ORIGIN}/`)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (url.startsWith("https://") || url.startsWith("http://")) {
       void shell.openExternal(url);
     }
   });
@@ -126,6 +174,8 @@ async function bootstrap(): Promise<void> {
     stopServer = await startRpcServer({
       runtimeDir,
       wsPort: WS_PORT,
+      allowedOrigin: APP_ORIGIN,
+      authToken: WS_TOKEN,
     });
   } catch (err) {
     const message =
@@ -167,12 +217,17 @@ ipcMain.handle("file:open", async () => {
 
   const filePath = result.filePaths[0];
   const content = await fs.readFile(filePath, "utf8");
+  userChosenPaths.add(filePath);
   return { filePath, content };
 });
 
 ipcMain.handle(
   "file:save",
   async (_event, { content, filePath }: { content: string; filePath: string }) => {
+    if (!userChosenPaths.has(filePath)) {
+      return false;
+    }
+
     await fs.writeFile(filePath, content, "utf8");
     return true;
   },
@@ -198,6 +253,7 @@ ipcMain.handle(
     }
 
     await fs.writeFile(result.filePath, content, "utf8");
+    userChosenPaths.add(result.filePath);
     return { filePath: result.filePath };
   },
 );
@@ -338,6 +394,10 @@ ipcMain.handle(
 ipcMain.handle(
   "net:fetch",
   async (_event, url: string): Promise<{ ok: boolean; status: number; text: string }> => {
+    if (url !== OFFICIAL_SNIPPETS_URL) {
+      return { ok: false, status: 0, text: "URL not allowed" };
+    }
+
     try {
       const response = await net.fetch(url, {
         headers: { "User-Agent": "Hacklily-Desktop/1.0" },

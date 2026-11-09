@@ -43,7 +43,7 @@ jobs:
         run: npm ci
 
       - name: Install desktop dependencies
-        run: npm install
+        run: npm ci
         working-directory: desktop
 
       - name: Prepare runtime (macOS)

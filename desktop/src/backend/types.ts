@@ -33,4 +33,8 @@ export interface JsonRpcResponse {
 export interface RuntimeConfig {
   runtimeDir: string;
   wsPort: number;
+  /** Only WebSocket handshakes with exactly this Origin are accepted. */
+  allowedOrigin: string;
+  /** Secret generated at startup and required as ?token= on the WebSocket URL. */
+  authToken: string;
 }

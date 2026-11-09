@@ -32,7 +32,14 @@ export interface NetFetchResult {
   text: string;
 }
 
+const WS_TOKEN_ARG = "--hacklily-ws-token=";
+
 contextBridge.exposeInMainWorld("electronAPI", {
+  /** Secret for the local render WebSocket, generated at each app start. */
+  wsToken: process.argv
+    .find((arg) => arg.startsWith(WS_TOKEN_ARG))
+    ?.slice(WS_TOKEN_ARG.length),
+
   /** Show native Open dialog and return {filePath, content}, or null if cancelled. */
   openFile: (): Promise<OpenFileResult | null> =>
     ipcRenderer.invoke("file:open"),

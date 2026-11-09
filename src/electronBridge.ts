@@ -58,6 +58,7 @@ export interface NetFetchResult {
 }
 
 interface ElectronAPI {
+  wsToken?: string;
   openFile(): Promise<OpenFileResult | null>;
   saveFile(content: string, filePath: string): Promise<boolean>;
   saveFileAs(
@@ -80,6 +81,12 @@ function getAPI(): ElectronAPI | null {
 /** True only when running inside Electron Desktop. */
 export function isDesktop(): boolean {
   return getAPI() !== null;
+}
+
+/** Adds the desktop app's secret to the backend URL; unchanged on the web. */
+export function withBackendToken(url: string): string {
+  const token = getAPI()?.wsToken;
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 }
 
 /** Show the native "Open File" dialog. Returns null if user cancelled. */
